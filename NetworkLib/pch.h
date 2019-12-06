@@ -19,9 +19,11 @@
 #include "cMassagebuf.h"
 #include "RingbufferQue.h"
 //#include "RingBuffer.h"
+#include "logfile.h"
 #include "NetworkLib.h"
 #include "echoServer.h"
-#include "LogSystem.h"
+//#include "LogSystem.h"
+
 
 
 

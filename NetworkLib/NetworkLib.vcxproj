@@ -156,7 +156,6 @@
     <ClInclude Include="cMassagebuf.h" />
     <ClInclude Include="echoServer.h" />
     <ClInclude Include="logfile.h" />
-    <ClInclude Include="LogSystem.h" />
     <ClInclude Include="NetworkLib.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="RingbufferQue.h" />
@@ -166,7 +165,6 @@
     <ClCompile Include="echoserver.cpp" />
     <ClCompile Include="echoserverMain.cpp" />
     <ClCompile Include="logfile.cpp" />
-    <ClCompile Include="LogSystem.cpp" />
     <ClCompile Include="NetworkLib.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

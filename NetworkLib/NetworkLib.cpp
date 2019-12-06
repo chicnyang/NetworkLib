@@ -311,7 +311,7 @@ void cNetworkLib::WorkerLoop()
 				int moverearresult = mysession->recvQ.Moverear(transbyte);
 				if (moverearresult == 0 || moverearresult == -1)
 				{
-					LOG(LOG_LEVEL_DEBUG,L"io - recv moverear  %d", transbyte);
+					LOG(L"ringbuffer",LOG_LEVEL_DEBUG,L"io - recv moverear  %d", transbyte);
 				}
 
 				for (;;)
@@ -329,7 +329,7 @@ void cNetworkLib::WorkerLoop()
 
 					if (peekresulr == 0 || peekresulr == -1)
 					{
-						LOG(LOG_LEVEL_DEBUG, L"io - recv peek  %d", usesize);
+						LOG(L"ringbuffer",LOG_LEVEL_DEBUG, L"io - recv peek  %d", usesize);
 					}
 					if (len != 8)
 					{
@@ -348,11 +348,11 @@ void cNetworkLib::WorkerLoop()
 
 					if (header == 0 || header == -1)
 					{
-						LOG(LOG_LEVEL_DEBUG, L"io - recv hederdeque  %d", usesize);
+						LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - recv hederdeque  %d", usesize);
 					}
 					if (deque == 0 || deque == -1)
 					{
-						LOG(LOG_LEVEL_DEBUG, L"io - recv hederdeque  %d", usesize);
+						LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - recv hederdeque  %d", usesize);
 					}
 					msg.MoveWritepos(len);
 
@@ -367,7 +367,7 @@ void cNetworkLib::WorkerLoop()
 				int movefrontresult = mysession->sendQ.Movefront(transbyte);
 				if (movefrontresult == 0 || movefrontresult == -1)
 				{
-					LOG(LOG_LEVEL_DEBUG, L"io - send movefront  %d", transbyte);
+					LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - send movefront  %d", transbyte);
 				}
 				//샌드 링버퍼에 보낼게 있다면보내기 
 				InterlockedExchange((LONG*)&mysession->bSend, 0);
@@ -379,7 +379,7 @@ void cNetworkLib::WorkerLoop()
 				}
 				else if (usesize < 0)
 				{
-					LOG(LOG_LEVEL_DEBUG, L"io - send usesize -1  %d", usesize);
+					LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - send usesize -1  %d", usesize);
 				}
 			}
 
@@ -407,7 +407,7 @@ BOOL cNetworkLib::RecvPost(stSession* session)
 
 	if(direnquesize == 0 || freesize == 0)
 	{
-		LOG(LOG_LEVEL_DEBUG, L"recvpost size 0 free -  %d , dir %d ", freesize,direnquesize);
+		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"recvpost size 0 free -  %d , dir %d ", freesize,direnquesize);
 	}
 
 	recvwsabuf[0].buf = (char*)session->recvQ.Getrearptr();
@@ -491,7 +491,7 @@ void cNetworkLib::SendPost(stSession* session)
 
 	if (dirdequesize == 0 || usesize == 0)
 	{
-		LOG(LOG_LEVEL_DEBUG, L"recvpost size 0 free -  %d , dir %d ", usesize, dirdequesize);
+		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"recvpost size 0 free -  %d , dir %d ", usesize, dirdequesize);
 	}
 
 
@@ -559,7 +559,7 @@ cNetworkLib::stSession* cNetworkLib::AllocSession()
 	}
 	else
 	{
-		LOG(LOG_LEVEL_DEBUG, L"pool is full ");
+		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"pool is full ");
 	}
 	LeaveCriticalSection(&pool_cs);
 
@@ -592,7 +592,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 	stSession* deletesession = FindSession(session->sessionKey);
 	if (deletesession == NULL)
 	{
-		LOG(LOG_LEVEL_DEBUG, L"deletesession id -  %d ", session->sessionKey);
+		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"deletesession id -  %d ", session->sessionKey);
 	}
 
 	AcquireSRWLockExclusive(&map_cs);
@@ -603,7 +603,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 
 	if (session->type == release)
 	{
-		LOG(LOG_LEVEL_DEBUG, L"deletesession - release id -  %d ", session->sessionKey);
+		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"deletesession - release id -  %d ", session->sessionKey);
 		LeaveCriticalSection(&session->cs);
 
 		return;

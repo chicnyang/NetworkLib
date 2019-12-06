@@ -1,10 +1,11 @@
 #include "pch.h"
 #include <time.h>
+#include <strsafe.h>
 #include "logfile.h"
 
 LONG logcount = 0;
 SRWLOCK _srwlock;
-
+int g_loglevel;
 //void logfile(WCHAR *szType, int LogLevel, WCHAR *szStringFormat, ...)
 //{
 //	static int count = 0;
@@ -172,8 +173,13 @@ SRWLOCK _srwlock;
 //
 //}
 
+void LogInitial()
+{
+	InitializeSRWLock(&_srwlock);
+}
 
-void Logfile(WCHAR *szType, int LogLevel, WCHAR *szStringFormat, ...)
+
+void Logfile(const WCHAR *szType, int LogLevel, const WCHAR *szStringFormat, ...)
 {
 	//내가원하는 로그 레벨이 아니면 나간다.
 	if (g_loglevel > LogLevel)
@@ -188,7 +194,7 @@ void Logfile(WCHAR *szType, int LogLevel, WCHAR *szStringFormat, ...)
 	GetLocalTime(&stNowTime);
 
 	WCHAR Errbuf[512] = { 0 };
-
+	WCHAR logerr[200];
 
 	//에러내용 밀어넣기 
 	va_list va;
@@ -197,7 +203,8 @@ void Logfile(WCHAR *szType, int LogLevel, WCHAR *szStringFormat, ...)
 	if(FAILED(vprintresulrt))
 	{
 		//밀어넣는데 실패 로그 남김 
-
+		memcpy(logerr, Errbuf,200);
+		LOG(L"va in errbuf", LOG_LEVEL_ERROR, L"%s", logerr);
 	}
 	va_end(va);
 
@@ -209,56 +216,49 @@ void Logfile(WCHAR *szType, int LogLevel, WCHAR *szStringFormat, ...)
 	if (FAILED(printresult))
 	{
 		//밀어넣는데 실패 로그 남김 
-
+		LOG(L"filename err", LOG_LEVEL_ERROR,L"type :%s ", szType);
 	}
 
 
 	WCHAR logbuf[1024];
-
+	WCHAR printerrbuf[1024];
+	WCHAR loglevel[20];
 	switch (LogLevel)
 	{
 	case LOG_LEVEL_DEBUG:
-
-		HRESULT printresult = StringCchPrintf(logbuf, 1024, L"[DEBUG][%d%02d%02d _ %02d.%02d.%02d]_[%s]_[%08d] : %s", stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, szType,mlogcount, Errbuf);
-		if (FAILED(printresult))
-		{
-			//밀어넣는데 실패 로그 남김 
-
-		}
+		StringCchPrintf(loglevel,20,L"[DEBUG]");
 		break;
 	case LOG_LEVEL_WARNING:
-		HRESULT printresult = StringCchPrintf(logbuf, 1024, L"[WARNING][%d%02d%02d _ %02d.%02d.%02d]_[%s]_[%08d] : %s", stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, szType, mlogcount, Errbuf);
-		if (FAILED(printresult))
-		{
-			//밀어넣는데 실패 로그 남김 
-
-		}
+		StringCchPrintf(loglevel, 20, L"[WARNING]");
 		break;
 	case LOG_LEVEL_ERROR:
-
-		HRESULT printresult = StringCchPrintf(logbuf, 1024, L"[ERROR][%d%02d%02d _ %02d.%02d.%02d]_[%s]_[%08d] : %s", stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, szType, mlogcount, Errbuf);
-		if (FAILED(printresult))
-		{
-			//밀어넣는데 실패 로그 남김 
-
-		}
+		StringCchPrintf(loglevel, 20, L"[ERROR]");
 		break;
 
 	case LOG_LEVEL_SYSTEM:
-		HRESULT printresult = StringCchPrintf(logbuf, 1024, L"[SYSTEM][%d%02d%02d _ %02d.%02d.%02d]_[%s]_[%08d] : %s", stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, szType, mlogcount, Errbuf);
-		if (FAILED(printresult))
-		{
-			//밀어넣는데 실패 로그 남김 
-
-		}
+		StringCchPrintf(loglevel, 20, L"[SYSTEM]");
 		break; 
 	default:
 		break;
 	}
+
+
+	printresult = StringCchPrintf(logbuf, 1024, L"%s[%d%02d%02d _ %02d.%02d.%02d]_[%s]_[%08d] : %s", loglevel, stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, szType, mlogcount, Errbuf);
+	if (FAILED(printresult))
+	{
+		//밀어넣는데 실패 로그 남김 
+		memcpy(Errbuf, printerrbuf, 500);
+		LOG(L"errlog in logbuf", LOG_LEVEL_ERROR, L"%s", printerrbuf);
+	}
+
+
 	//파일 오픈 
 
 	errno_t err;
 	FILE *fp;
+
+
+	AcquireSRWLockExclusive(&_srwlock);
 
 	int recount = 0;
 	for(;;)
@@ -269,22 +269,24 @@ void Logfile(WCHAR *szType, int LogLevel, WCHAR *szStringFormat, ...)
 			break;
 		}
 		recount++;
-		if (recount > 5)
+		if (recount > 10)
 		{
-			//파일오픈실패 로그남김 
-			break;
+			//파일오픈실패 종료 
+			ReleaseSRWLockExclusive(&_srwlock);
+			return;
 		}
 
 	}
+	//파일 오픈 성공 
 	fseek(fp, 0, 0);
-
-
-
+	fwprintf(fp, logbuf);
 	fclose(fp);
+
+	ReleaseSRWLockExclusive(&_srwlock);
 
 }
 
-void LogHex(WCHAR *szType, int LogLevel, WCHAR *szLog, BYTE *pByte, int iByteLen)
+void LogHex(const WCHAR *szType, int LogLevel, const WCHAR *szLog, BYTE *pByte, int iByteLen)
 {
 
 }

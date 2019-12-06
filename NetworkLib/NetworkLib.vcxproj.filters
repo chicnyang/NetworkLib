@@ -30,9 +30,6 @@
     <ClInclude Include="echoServer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="LogSystem.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="logfile.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -51,9 +48,6 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="echoserver.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="LogSystem.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="RingbufferQue.cpp">

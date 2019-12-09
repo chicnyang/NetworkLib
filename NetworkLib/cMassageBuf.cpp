@@ -5,7 +5,10 @@ cMassage::cMassage()
 {
 	//hHeap = HeapCreate(0,0,0);
 	//pBuf = (BYTE*)HeapAlloc(hHeap,0, eBuffer_defaultsize);
-	pBuf = (BYTE*)malloc(eBuffer_defaultsize);
+	msgptr = (BYTE*)malloc(eBuffer_defaultsize);
+
+	pHeader = msgptr;
+	pBuf = pHeader + 5;
 
 	front = 0;
 	rear = 0;
@@ -53,11 +56,33 @@ void cMassage::resize(int size)
 
 }
 
+void cMassage::settingHeader(int byte)
+{
+	headersize = byte;
+	WORD size = bufUsesize;
+
+	switch (headersize)
+	{
+	case 2:
+		pHeader += 3;
+		memcpy_s(pHeader,2, &size, sizeof(size));
+		break;
+	case 5:
+		//나중에 세팅할것.
+		break;
+
+	default:
+		break;
+	}
+	
+}
+
+
 //메시지 파괴  -  버퍼 지우기 
 void cMassage::Release(void)
 {
 //	HeapDestroy(hHeap);
-	free(pBuf);
+	free(msgptr);
 }
 
 //메시지 청소  -  버퍼 비우기 
@@ -65,6 +90,7 @@ void cMassage::Clear(void)
 {
 	front = 0;
 	rear = 0;
+	headersize = 0;
 }
 
 //버퍼 사이즈 얻기
@@ -79,6 +105,10 @@ int cMassage::Getusesize(void)
 	return bufUsesize;
 }
 
+BYTE* cMassage::GetHeaderbufferptr(void)
+{
+	return pHeader;
+}
 
 //버퍼포인터 얻기
 BYTE* cMassage::Getbufferptr(void)
@@ -461,4 +491,9 @@ int cMassage::InputData(BYTE *Src, int iSize)
 BOOL cMassage::sizeerr()
 {
 	return bSizenotuse;
+}
+
+int cMassage::GetHeaderusesize(void)
+{
+	return headersize + bufUsesize;
 }

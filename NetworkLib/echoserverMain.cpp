@@ -16,7 +16,7 @@ int main()
 
 	cEchoserver::ServerSetting serversetting;
 	serversetting.sockaddr = serveraddr;
-	serversetting.SessionPoolCount = 3000;
+	serversetting.SessionPoolCount = 1000;
 	serversetting.ThreadMax = 10;
 	serversetting.ThreadRun = 0;
 
@@ -29,7 +29,15 @@ int main()
 		if (key == 'z')
 		{
 			server.CloseNetserver();
-			break;
+			//server.~cEchoserver();
+		}
+		if (key == 'x')
+		{
+			server.StartNetserver(&serversetting);
+		}
+		if (key == 'c')
+		{
+			server.~cEchoserver();
 		}
 
 		Sleep(10);

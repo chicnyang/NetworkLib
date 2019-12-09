@@ -4,18 +4,23 @@
 
 void cEchoserver::onRecv(__int64 sessionKey, cMassage* msg)
 {
-	SendPacket(sessionKey, msg);
+
+	cMassage* cmsg = new cMassage;
+
+	*cmsg = *msg;
+
+	SendPacket(sessionKey, cmsg);
 }
 
 void cEchoserver::onClientJoin(__int64 sessionKey)
 {
-	cMassage msg;
+	cMassage* msg = new cMassage;
 
 	__int64 data = 0x7fffffffffffffff;
 
-	msg << data;
+	*msg << data;
 
-	SendPacket(sessionKey, &msg);
+	SendPacket(sessionKey, msg);
 
 }
 void cEchoserver::onClientLeave()

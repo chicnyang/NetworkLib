@@ -9,6 +9,11 @@ class cRingbuffer
 	int front;
 	int rear;
 
+	int peekfront;
+	BOOL peeknext = false;
+	int sendcount;
+	int nextcount;
+
 	int bufsize;//버퍼 사이즈 
 
 	BYTE *start;
@@ -28,6 +33,7 @@ public:
 
 	void Resize(int size);
 	int Getquesize();  //현재 사용중인 용량 얻기
+	int Getquepeeksize();  //현재 사용중인 용량 얻기
 	int Getquefreesize(); //현재 사용가능한 (남은)용량 얻기
 
 //	int Getrear() { return rear; }
@@ -35,11 +41,14 @@ public:
 
 	int DirectEnquesize(); //끊기지않고 한번에 넣을수 있는 용량
 	int DirectDequesize();//끊기지않고 한번에 뺄수 있는 용량
+	int DirectDequepeeksize();//끊기지않고 한번에 뺄수 있는 용량
 
 	int Enque(const BYTE* data, int isize);
 	int Deque(BYTE* Destbuf, int isize);
 
 	int Peek(BYTE* Destbuf, int isize);
+	int NextPeek(BYTE* Destbuf, int isize,int pCount);
+
 
 	int Moverear(int isize);
 	int Movefront(int isize);
@@ -55,7 +64,8 @@ public:
 	void Lock();
 	void Unlock();
 
-
+	void setsendcount(int count);
+	int getsendcount();
 };
 
 

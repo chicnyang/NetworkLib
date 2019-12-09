@@ -5,6 +5,7 @@
 
 
 
+
 cNetworkLib::cNetworkLib()
 {
 
@@ -17,10 +18,13 @@ cNetworkLib::~cNetworkLib()
 
 void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 {
+	packet->settingHeader(2);
+
 
 	stSession* session = FindSession(sessionKey);
 	if (session == NULL)
 	{
+		delete packet;
 		return;
 	}
 	
@@ -28,23 +32,25 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 
 	EnterCriticalSection(&session->cs);
 
+
 	if (session->type == release)
 	{
+		delete packet;
 		LeaveCriticalSection(&session->cs);
 		return;
 	}
 	if (session->sessionKey != sessionKey)
 	{
+		delete packet;
 		LeaveCriticalSection(&session->cs);
 
 		return;
 	}
 
-	WORD usesize = packet->Getusesize();
-	//헤더넣고 페이로드 인큐 
+	//헤더 생성 
 
-	session->sendQ.Enque((BYTE*)&usesize,sizeof(WORD));
-	session->sendQ.Enque(packet->Getbufferptr(), usesize);
+	//메시지 인큐 
+	session->sendQ.Enque((BYTE*)&packet, sizeof(packet));
 
 	SendPost(session);
 
@@ -78,7 +84,6 @@ void cNetworkLib::StartNetserver(ServerSetting* serversetting)
 {
 
 	sessionNum = 1;
-
 
 	poolCount = serversetting->SessionPoolCount;
 
@@ -160,8 +165,22 @@ void cNetworkLib::CloseNetserver()
 	//소켓 연결 끊기 - 리슨 소켓 클로즈
 	closesocket(listen_socket);
 
+	WaitForSingleObject(ThreadArray[0],INFINITE);
 
-	//리스트와 맵의 모든 요소 해제 
+	AcquireSRWLockExclusive(&map_cs);
+
+	std::unordered_map<__int64, stSession*>::iterator mapiter;
+	std::unordered_map<__int64, stSession*>::iterator mapenditer = sessionMap.end();
+	for (mapiter = sessionMap.begin(); mapiter != mapenditer; ++mapiter)
+	{
+		closesocket((*mapiter).second->socket);
+	}
+
+	ReleaseSRWLockExclusive(&map_cs);
+
+
+	//pool 에 다 들어올때까지 기다리기 
+
 	for(;;)
 	{
 		if (sessionMap.empty() && sessionPool.size() == poolCount)
@@ -177,9 +196,30 @@ void cNetworkLib::CloseNetserver()
 	for (iter = sessionPool.begin(); iter != olditer;)
 	{
 		DeleteCriticalSection(&(*iter)->cs);
+
+		int usesize = (*iter)->sendQ.Getquesize();
+		if (usesize > 0)
+		{
+			for (int i = 0; i < (usesize / 8); i++)
+			{
+				cMassage* msg;
+				(*iter)->sendQ.Deque((BYTE*)&msg,sizeof(msg));
+				delete msg;
+
+			}
+		}
+
 		delete *iter;
 		iter = sessionPool.erase(iter);
 	}
+	sessionMap.clear();
+	sessionPool.clear();
+	std::unordered_map<__int64, stSession*> emptysessionMap;
+	std::list<stSession*> emptysessionPool;
+
+	sessionMap.swap(emptysessionMap);
+	sessionPool.swap(emptysessionPool);
+
 
 	//스레드 종료 
 	for (int i = 0; i < ThreadMax; i++)
@@ -196,12 +236,15 @@ void cNetworkLib::CloseNetserver()
 		CloseHandle(ThreadArray[i]);
 	}
 	
+	CloseHandle(hIocp);
+
 	//스레드 배열 정리
 	delete[] ThreadArray;
 
 	DeleteCriticalSection(&pool_cs);
 
 
+	WSACleanup();
 
 }
 
@@ -275,6 +318,7 @@ void cNetworkLib::AcceptLoop()
 
 
 		sessionNum++;
+
 	}
 }
 
@@ -364,11 +408,16 @@ void cNetworkLib::WorkerLoop()
 			}
 			else  //send 일때 
 			{
-				int movefrontresult = mysession->sendQ.Movefront(transbyte);
-				if (movefrontresult == 0 || movefrontresult == -1)
+				//mysession->sendQ.Movefront(transbyte);
+				int sendcount = mysession->sendQ.getsendcount();
+				for (int i = 0; i < sendcount; i++)
 				{
-					LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - send movefront  %d", transbyte);
+					cMassage* msg;
+					mysession->sendQ.Deque((BYTE*)&msg,sizeof(msg));
+					delete msg;
 				}
+
+
 				//샌드 링버퍼에 보낼게 있다면보내기 
 				InterlockedExchange((LONG*)&mysession->bSend, 0);
 				int usesize = mysession->sendQ.Getquesize();
@@ -482,8 +531,8 @@ void cNetworkLib::SendPost(stSession* session)
 
 	} while (0);
 
-
-	WSABUF sendwsabuf[2];
+	//최대크기 
+	WSABUF sendwsabuf[1000];
 	//wsabuf  에 받을 링버퍼 포인터 넣기 
 	//링버퍼 경계 걸치는 지 확인후 추가로 버퍼포인터 넣을지 결정 
 
@@ -493,27 +542,26 @@ void cNetworkLib::SendPost(stSession* session)
 	{
 		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"recvpost size 0 free -  %d , dir %d ", usesize, dirdequesize);
 	}
+	
 
-
-	int sendbufcount = 0;
-
-
-	if (usesize > dirdequesize)
+	int sendbufcount = usesize / 8;
+	
+	for (int i = 0; i < sendbufcount; i++)
 	{
-		sendwsabuf[0].buf = (char*)session->sendQ.Getfrontptr();
-		sendwsabuf[0].len = dirdequesize;
-		sendwsabuf[1].buf = (char*)session->sendQ.Getbufptr();
-		sendwsabuf[1].len = usesize - dirdequesize;
-
-		sendbufcount = 2;
+		cMassage* msg;
+		if (-1 != session->sendQ.NextPeek((BYTE*)&msg, 8, sendbufcount))
+		{
+			sendwsabuf[i].buf = (char*)msg->GetHeaderbufferptr();
+			sendwsabuf[i].len = msg->GetHeaderusesize();
+		}
+		else
+		{
+			sendbufcount = i;
+		}
 	}
-	else
-	{
-		sendwsabuf[0].buf = (char*)session->sendQ.Getfrontptr();
-		sendwsabuf[0].len = usesize;
-		sendbufcount = 1;
+	session->sendQ.setsendcount(sendbufcount);
 
-	}
+
 
 	ZeroMemory(&session->sendoverlap.overlap, sizeof(session->sendoverlap.overlap));
 	DWORD sendretbyte = 0;
@@ -608,6 +656,15 @@ void cNetworkLib::DeleteSession(stSession * session)
 
 		return;
 	}
+
+	int sendcount = session->sendQ.Getquesize()/8;
+	for (int i = 0; i < sendcount; i++)
+	{
+		cMassage* msg;
+		session->sendQ.Deque((BYTE*)&msg, sizeof(msg));
+		delete msg;
+	}
+
 
 	SOCKET sock = session->socket;
 	session->socket = INVALID_SOCKET;

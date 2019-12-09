@@ -63,6 +63,21 @@ int cRingbuffer::Getquesize()  //현재 사용중인 용량 얻기
 
 }
 
+int cRingbuffer::Getquepeeksize()
+{
+	if (start == NULL)
+		return -1;
+
+	int i_front = peekfront;
+	int i_rear = rear;
+
+
+	if (i_front <= i_rear)
+		return i_rear - i_front;
+	else
+		return (bufsize - i_front) + i_rear;
+}
+
 int cRingbuffer::Getquefreesize() //현재 사용가능한 (남은)용량 얻기
 {
 	//rear 에서 front 까지 용량 확인.중간에 끊기는지 확인
@@ -114,12 +129,25 @@ int cRingbuffer::DirectDequesize()//끊기지않고 한번에 뺄수 있는 용량
 	int i_front = front;
 	int i_rear = rear;
 
-	if (front <= i_rear)
+	if (i_front <= i_rear)
 		return i_rear - i_front;
 	else
 		return bufsize - i_front;
 }
+int cRingbuffer::DirectDequepeeksize()
+{
+	//front 에서 rear 까지 또는 끝까지 확인.
+	if (start == NULL)
+		return -1;
 
+	int i_front = peekfront;
+	int i_rear = rear;
+
+	if (i_front <= i_rear)
+		return i_rear - i_front;
+	else
+		return bufsize - i_front;
+}
 
 //인큐 - 데이터 만큼 넣고 rear 위치 옮긴다. 끝났을경우 다시 start 로 가서 쓴다 front 랑 만나면 실패.
 int cRingbuffer::Enque(const BYTE* data, int isize)
@@ -225,6 +253,68 @@ int cRingbuffer::Peek(BYTE* Destbuf, int isize)
 	}
 
 	return isize;
+}
+
+int cRingbuffer::NextPeek(BYTE* Destbuf, int isize, int pCount)
+{
+	if (start == NULL)
+		return -1;
+
+
+
+
+
+
+	if (!peeknext)
+	{
+		nextcount = pCount;
+		peekfront = front;
+		peeknext = true;
+	}
+	if (peekfront == rear || nextcount == 0)
+	{
+		peeknext = false;
+		return -1;
+	}
+
+	//디큐에서 front 위치만 안옮기기
+	int usesize = Getquepeeksize();
+	//뺄만큼 데이터 없거나 있을때. 
+	int dirsize = DirectDequepeeksize(); //한번에 뺄수 있는 용량 
+
+	if (isize <= dirsize)  //한번에 뺄수 있음. 
+	{
+		memcpy_s(Destbuf, isize, start + peekfront, isize); //카피
+	}
+	else //한번에 뺄수없음. 경계 걸침.  -  뺄만큼 데이터 없음.
+	{
+		memcpy_s(Destbuf, dirsize, start + peekfront, dirsize); //카피
+		memcpy_s(Destbuf + dirsize, isize - dirsize, start, isize - dirsize);
+	}
+
+	peekfront = (peekfront + isize) % bufsize;
+
+	nextcount--;
+	
+
+	if (peekfront == rear || nextcount == 0)
+	{
+		peeknext = false;
+	}
+
+	return isize;
+
+}
+
+void cRingbuffer::setsendcount(int count)
+{
+	sendcount = count;
+	return;
+}
+
+int cRingbuffer::getsendcount()
+{
+	return sendcount;
 }
 
 int cRingbuffer::Moverear(int isize)

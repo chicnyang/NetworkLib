@@ -119,10 +119,12 @@ private:
 	std::unordered_map<__int64, stSession*> sessionMap;
 
 
-	int closecount=0;
-	std::unordered_map<__int64, stSession*> closeMap;
-
 	void InputSession(stSession* session);
 	void DeleteSession(stSession * session);
 	stSession* FindSession(__int64 sessionKey);
+
+
+
+	int countalloc = 0;
+	int allocfree = 0;
 };

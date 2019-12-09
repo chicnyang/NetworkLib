@@ -5,14 +5,20 @@
 
 class cMassage
 {
-protected:
+private:
 
 	BYTE* pBuf;
 	int front;
 	int rear;
 	HANDLE hHeap;
+	BYTE* msgptr;
+	BYTE* pHeader;
+	int headersize;
 
+	//헤더 세팅 함수 
+	void settingHeader(int byte);
 
+	friend class  cNetworkLib;
 
 public:
 	enum eMassage  //define -> 모든 소스파일에서 사용 enum 으로 클래스 함수 안에서만 사용 public 으로 밖에서 접근시 값확인만 가능 
@@ -38,9 +44,11 @@ public:
 
 	//사용중인 사이즈 얻기
 	int Getusesize(void);
-
+	int GetHeaderusesize(void);
 
 	//버퍼포인터 얻기
+	BYTE* GetHeaderbufferptr(void);
+	//페이로드 포인터 얻기 
 	BYTE* Getbufferptr(void);
 
 	//버퍼 ptroffset 이동.

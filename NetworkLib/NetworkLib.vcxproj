@@ -154,6 +154,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="cMassagebuf.h" />
+    <ClInclude Include="DumpFile.h" />
     <ClInclude Include="echoServer.h" />
     <ClInclude Include="logfile.h" />
     <ClInclude Include="NetworkLib.h" />

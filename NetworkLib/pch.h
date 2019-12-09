@@ -16,6 +16,7 @@
 #include <Windows.h>
 #include <unordered_map>
 #include <process.h>
+#include "DumpFile.h"
 #include "cMassagebuf.h"
 #include "RingbufferQue.h"
 //#include "RingBuffer.h"

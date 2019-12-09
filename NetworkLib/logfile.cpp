@@ -247,7 +247,7 @@ void Logfile(const WCHAR *szType, int LogLevel, const WCHAR *szStringFormat, ...
 	if (FAILED(printresult))
 	{
 		//밀어넣는데 실패 로그 남김 
-		memcpy(Errbuf, printerrbuf, 500);
+		memcpy(printerrbuf, Errbuf, 500);
 		LOG(L"errlog in logbuf", LOG_LEVEL_ERROR, L"%s", printerrbuf);
 	}
 

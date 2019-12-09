@@ -3,8 +3,8 @@
 
 //start end rear + 1byte.
 
-
-
+long cDump::dumpcount;
+extern cDump dump;
 
 cRingbuffer::cRingbuffer()
 {
@@ -247,9 +247,13 @@ int cRingbuffer::Moverear(int isize)
 
 
 int cRingbuffer::Movefront(int isize)
-{	
+{
 	if (start == NULL)
+	{
+		dump.Crash();
 		return -1;
+	}
+
 
 	int i_front = front;
 	int i_rear = rear;
@@ -260,7 +264,12 @@ int cRingbuffer::Movefront(int isize)
 
 
 	if (usesize < isize)
+	{
+		dump.Crash();
+		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"front  %d , rear  %d , usesize  %d ", front, rear, usesize);
 		return 0;
+	}
+
 
 	front = (front + isize) % bufsize;
 	return isize;

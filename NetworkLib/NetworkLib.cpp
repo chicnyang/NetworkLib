@@ -4,6 +4,7 @@
 #include "pch.h"
 
 
+extern cDump dump;
 
 cNetworkLib::cNetworkLib()
 {
@@ -43,8 +44,8 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 	WORD usesize = packet->Getusesize();
 	//헤더넣고 페이로드 인큐 
 
-	session->sendQ.Enque((BYTE*)&usesize,sizeof(WORD));
-	session->sendQ.Enque(packet->Getbufferptr(), usesize);
+	int enqsize = session->sendQ.Enque((BYTE*)&usesize,sizeof(WORD));
+	int enqpaysize = session->sendQ.Enque(packet->Getbufferptr(), usesize);
 
 	SendPost(session);
 
@@ -367,7 +368,7 @@ void cNetworkLib::WorkerLoop()
 				int movefrontresult = mysession->sendQ.Movefront(transbyte);
 				if (movefrontresult == 0 || movefrontresult == -1)
 				{
-					LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - send movefront  %d", transbyte);
+					LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - send movefront  %d , result  %d", transbyte, movefrontresult);
 				}
 				//샌드 링버퍼에 보낼게 있다면보내기 
 				InterlockedExchange((LONG*)&mysession->bSend, 0);
@@ -510,7 +511,7 @@ void cNetworkLib::SendPost(stSession* session)
 	else
 	{
 		sendwsabuf[0].buf = (char*)session->sendQ.Getfrontptr();
-		sendwsabuf[0].len = usesize;
+		sendwsabuf[0].len = dirdequesize;
 		sendbufcount = 1;
 
 	}

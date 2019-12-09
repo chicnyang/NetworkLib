@@ -4,6 +4,9 @@
 
 #define SERVERPORT 6000
 
+cDump dump;
+
+
 int main()
 {
 	cEchoserver server;

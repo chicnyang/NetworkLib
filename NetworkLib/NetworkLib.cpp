@@ -287,7 +287,7 @@ void cNetworkLib::AcceptLoop()
 		}
 
 		int optval = 0;
-		//setsockopt(sock,SOL_SOCKET,SO_SNDBUF,(const char*)&optval,sizeof(optval));
+		setsockopt(sock,SOL_SOCKET,SO_SNDBUF,(const char*)&optval,sizeof(optval));
 
 		AcceptCount++;
 		AcceptTotalCount++;
@@ -611,9 +611,9 @@ void cNetworkLib::SendPost(stSession* session)
 				session->startsend = timeGetTime();
 				int retsend = WSASend(session->socket, sendwsabuf, sendbufcount, &sendretbyte, 0, (OVERLAPPED*)&session->sendoverlap, NULL);
 				DWORD endtime = timeGetTime();
-				if ((endtime - session->startsend)<2)
+				if ((endtime - session->startsend) < 2)
 				{
-					sendPlustime += (timeGetTime() - session->startsend);
+					sendPlustime += (endtime - session->startsend);
 					InterlockedIncrement(&sendpluscounttime);
 				}
 

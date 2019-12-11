@@ -54,16 +54,20 @@ int main()
 		wprintf(L"Accept Total Session    : %ld \n", server.AcceptTotalCount);
 		wprintf(L"Accept TPS		: %d \n", server.AcceptCount);
 		wprintf(L"Recv TPS		: %d \n", server.RecvCount);
+		if (server.RecvCount < 70000)
+		{
+
+		}
 		wprintf(L"Send TPS		: %d \n", server.SendCount);
 		wprintf(L"Use Packet Count	: %d \n", cMassage::GetUsePacket());
 		wprintf(L"Packet Pool Capacity	: %d \n", cMassage::GetsizePacketPool());
 		if (server.sendcounttime != 0)
 		{
-			wprintf(L"send io avarge	: %f \n", ((float)server.Plustime / (float)server.sendcounttime));
+			wprintf(L"send io avarge	: %f \n", ((double)server.Plustime / (double)server.sendcounttime));
 		}
 		if (server.sendpluscounttime != 0)
 		{
-			wprintf(L"send use time	: %f \n", ((float)server.sendPlustime / (float)server.sendpluscounttime));
+			wprintf(L"send use time	: %f \n", ((double)server.sendPlustime / (double)server.sendpluscounttime));
 		}
 		wprintf(L"\n//=================================================================//\n");
 		wprintf(L"//=================================================================//\n");

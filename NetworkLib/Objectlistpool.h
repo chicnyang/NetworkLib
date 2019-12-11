@@ -298,11 +298,13 @@ public:
 		//가득차있다면 false
 		if (use_count == 0)
 		{
+			ReleaseSRWLockExclusive(&_poolsrw);
 			//예외발생
 			return false;
 		}
 		if (inNode->endCHKsum != CHKSUM || inNode->frontCHKsum != CHKSUM)
 		{
+			ReleaseSRWLockExclusive(&_poolsrw);
 			//예외발생 
 			return false;
 		}

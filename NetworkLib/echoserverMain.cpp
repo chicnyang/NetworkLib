@@ -4,6 +4,8 @@
 
 #define SERVERPORT 6000
 
+
+
 int main()
 {
 	cEchoserver server;
@@ -20,27 +22,61 @@ int main()
 	serversetting.ThreadMax = 10;
 	serversetting.ThreadRun = 0;
 
+	//cMassage::MemoryPool();
+
+	timeBeginPeriod(1);
+
 	server.StartNetserver(&serversetting);
+
+
 
 	while (true)
 	{
 
-		char key = _getwch();
-		if (key == 'z')
-		{
-			server.CloseNetserver();
-			//server.~cEchoserver();
-		}
-		if (key == 'x')
-		{
-			server.StartNetserver(&serversetting);
-		}
-		if (key == 'c')
-		{
-			server.~cEchoserver();
-		}
 
-		Sleep(10);
+		//if (key == 'z')
+		//{
+		//	server.CloseNetserver();
+		//	//server.~cEchoserver();
+		//}
+		//if (key == 'x')
+		//{
+		//	server.StartNetserver(&serversetting);
+		//}
+		//if (key == 'c')
+		//{
+		//	server.~cEchoserver();
+		//}
+		wprintf(L"\n");
+		wprintf(L"//=================================================================//\n");
+		wprintf(L"//=================================================================//\n\n");
+		wprintf(L"Connect Session		: %d \n", server.ConnectSessioncount);
+		wprintf(L"Accept Total Session    : %ld \n", server.AcceptTotalCount);
+		wprintf(L"Accept TPS		: %d \n", server.AcceptCount);
+		wprintf(L"Recv TPS		: %d \n", server.RecvCount);
+		wprintf(L"Send TPS		: %d \n", server.SendCount);
+		//wprintf(L"Use Packet Count	: %d \n", cMassage::GetUsePacket());
+		//wprintf(L"Packet Pool Capacity	: %d \n", cMassage::GetsizePacketPool());
+		if (server.sendcounttime != 0)
+		{
+			wprintf(L"send io avarge	: %f \n", ((float)server.Plustime / (float)server.sendcounttime));
+		}
+		if (server.sendpluscounttime != 0)
+		{
+			wprintf(L"send use time	: %f \n", ((float)server.sendPlustime / (float)server.sendpluscounttime));
+			if (server.sendPlustime > server.sendpluscounttime)
+			{
+				wprintf(L"sendplus :%d , sendcount : %d \n", server.sendPlustime,server.sendpluscounttime);
+			}
+		}
+		wprintf(L"\n//=================================================================//\n");
+		wprintf(L"//=================================================================//\n");
+		wprintf(L"\n");
+		InterlockedExchange(&server.RecvCount, 0);
+		InterlockedExchange(&server.SendCount, 0);
+		server.AcceptCount = 0;
+		Sleep(1000);
+
 	}
 
 

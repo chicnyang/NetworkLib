@@ -27,6 +27,24 @@ public:
 	void CloseNetserver();
 
 
+	//서버 상황 변수
+
+	//ConnectSession:
+	LONG ConnectSessioncount;
+	//Accept TPS :
+	LONG AcceptCount;
+	//Accept Total :
+	__int64 AcceptTotalCount;
+	//RecvPacket TPS :
+	LONG RecvCount;
+	//SendPacket TPS :
+	LONG SendCount;
+
+	LONG sendcounttime = 0;
+	LONG sendpluscounttime = 0;
+	__int64 Plustime = 0;
+
+	__int64 sendPlustime = 0;
 protected:
 
 	enum Mode
@@ -74,6 +92,7 @@ protected:
 
 		DWORD type;
 
+		DWORD startsend = 0;
 	};
 
 	virtual void onRecv(__int64 sessionKey, cMassage* msg) PURE;

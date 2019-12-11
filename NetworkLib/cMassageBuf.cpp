@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 
+//cMemoryPool<cMassage>* cMassage::packetPool;
 
 cMassage::cMassage()
 {
@@ -64,8 +65,7 @@ void cMassage::settingHeader(int byte)
 	switch (headersize)
 	{
 	case 2:
-		pHeader += 3;
-		memcpy_s(pHeader,2, &size, sizeof(size));
+		memcpy_s(pHeader+(5- headersize),2, &size, sizeof(size));
 		break;
 	case 5:
 		//나중에 세팅할것.
@@ -84,12 +84,30 @@ void cMassage::Release(void)
 //	HeapDestroy(hHeap);
 	free(msgptr);
 }
+//
+//void cMassage::MemoryPool(int size)
+//{
+//	packetPool = new cMemoryPool<cMassage>(size);
+//}
+//
+//cMassage * cMassage::Alloc()
+//{
+//	cMassage* msg = packetPool->alloc();
+//	msg->Clear();
+//	return msg;
+//}
+//
+//void cMassage::Free()
+//{
+//	packetPool->free(this);
+//}
 
 //메시지 청소  -  버퍼 비우기 
 void cMassage::Clear(void)
 {
 	front = 0;
 	rear = 0;
+	bufUsesize = 0;
 	headersize = 0;
 }
 
@@ -107,7 +125,7 @@ int cMassage::Getusesize(void)
 
 BYTE* cMassage::GetHeaderbufferptr(void)
 {
-	return pHeader;
+	return pHeader + (5 - headersize);
 }
 
 //버퍼포인터 얻기
@@ -492,6 +510,16 @@ BOOL cMassage::sizeerr()
 {
 	return bSizenotuse;
 }
+
+//int cMassage::GetUsePacket()
+//{
+//	return 	packetPool->usecount();
+//}
+//
+//int cMassage::GetsizePacketPool()
+//{
+//	return packetPool->alloccount();
+//}
 
 int cMassage::GetHeaderusesize(void)
 {

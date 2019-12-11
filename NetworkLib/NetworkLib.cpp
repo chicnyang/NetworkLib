@@ -24,7 +24,7 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 	stSession* session = FindSession(sessionKey);
 	if (session == NULL)
 	{
-		delete packet;
+		packet->Free();
 		return;
 	}
 	
@@ -35,13 +35,13 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 
 	if (session->type == release)
 	{
-		delete packet;
+		packet->Free();
 		LeaveCriticalSection(&session->cs);
 		return;
 	}
 	if (session->sessionKey != sessionKey)
 	{
-		delete packet;
+		packet->Free();
 		LeaveCriticalSection(&session->cs);
 
 		return;
@@ -286,6 +286,18 @@ void cNetworkLib::AcceptLoop()
 			return;
 		}
 
+		int optval = 0;
+		//setsockopt(sock,SOL_SOCKET,SO_SNDBUF,(const char*)&optval,sizeof(optval));
+
+		AcceptCount++;
+		AcceptTotalCount++;
+
+		//1초 지나면 0으로 초기화 
+
+
+
+
+
 		char ip[20] = { 0 };
 		inet_ntop(AF_INET, &(clientaddr.sin_addr), ip, 20);
 
@@ -313,8 +325,12 @@ void cNetworkLib::AcceptLoop()
 		//소켓과 IOCP 연결 
 		CreateIoCompletionPort((HANDLE)session->socket, hIocp, (ULONG_PTR)session, 0);
 
-		if(RecvPost(session))
+		if (RecvPost(session))
+		{
+
 			onClientJoin(session->sessionKey);
+		}
+
 
 
 		sessionNum++;
@@ -336,6 +352,17 @@ void cNetworkLib::WorkerLoop()
 		{
 			int retdebug = GetQueuedCompletionStatus(hIocp, &transbyte, (PULONG_PTR)&mysession, (LPOVERLAPPED*)&overlap, INFINITE);
 			//overlapped 확인 
+			if (overlap->mode == sendMode)
+			{
+				DWORD endtime = timeGetTime();
+				if ((endtime - mysession->startsend) < 2)
+				{
+					Plustime += (timeGetTime() - mysession->startsend);
+					InterlockedIncrement(&sendcounttime);
+				}
+				//Plustime += (timeGetTime() - mysession->startsend);
+				//InterlockedIncrement(&sendcounttime);
+			}
 
 			if (overlap == NULL)
 			{
@@ -357,9 +384,12 @@ void cNetworkLib::WorkerLoop()
 				{
 					LOG(L"ringbuffer",LOG_LEVEL_DEBUG,L"io - recv moverear  %d", transbyte);
 				}
+				int recvpacketcount = 0;
+				cMassage* msg = cMassage::Alloc();
 
 				for (;;)
 				{
+					msg->Clear();
 					WORD len = 0;
 					int usesize = mysession->recvQ.Getquesize();
 
@@ -386,9 +416,10 @@ void cNetworkLib::WorkerLoop()
 						break;
 					}
 
-					cMassage msg;
+					//cMassage msg;
+
 					int header = mysession->recvQ.Deque((BYTE*)&len, sizeof(WORD));
-					int deque = mysession->recvQ.Deque(msg.Getbufferptr(), len);
+					int deque = mysession->recvQ.Deque(msg->Getbufferptr(), len);
 
 					if (header == 0 || header == -1)
 					{
@@ -398,10 +429,14 @@ void cNetworkLib::WorkerLoop()
 					{
 						LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - recv hederdeque  %d", usesize);
 					}
-					msg.MoveWritepos(len);
+					msg->MoveWritepos(len);
+					//msg.MoveWritepos(len);
+					onRecv(mysession->sessionKey,msg);
 
-					onRecv(mysession->sessionKey,&msg);
+					recvpacketcount++;
 				}
+				msg->Free();
+				InterlockedAdd(&RecvCount, recvpacketcount);
 
 				//recv 걸기
 				RecvPost(mysession);
@@ -412,9 +447,9 @@ void cNetworkLib::WorkerLoop()
 				int sendcount = mysession->sendQ.getsendcount();
 				for (int i = 0; i < sendcount; i++)
 				{
-					cMassage* msg;
-					mysession->sendQ.Deque((BYTE*)&msg,sizeof(msg));
-					delete msg;
+					cMassage* packet;
+					mysession->sendQ.Deque((BYTE*)&packet,sizeof(packet));
+					packet->Free();
 				}
 
 
@@ -495,6 +530,7 @@ BOOL cNetworkLib::RecvPost(stSession* session)
 		}
 	}
 
+
 	return true;
 }
 
@@ -510,86 +546,108 @@ void cNetworkLib::SendPost(stSession* session)
 	{
 		if (InterlockedExchange((LONG*)&session->bSend, 1) == 0)
 		{
-
 			usesize = session->sendQ.Getquesize();
-		}
-		else
-			return;
 
-		if (usesize == 0)
-		{
-			InterlockedExchange((LONG*)&session->bSend, 0);
+			if (usesize == 0)
+			{
+				InterlockedExchange((LONG*)&session->bSend, 0);
 
-			usesize = session->sendQ.Getquesize();
-			if (usesize > 0)
-				continue;
+				usesize = session->sendQ.Getquesize();
+				if (usesize > 0)
+				{
+					continue;
+				}
+
+				else
+				{
+					break;;
+				}
+
+			}
 			else
-				return;
+			{
+				//최대크기 
+				WSABUF sendwsabuf[1000];
+				//wsabuf  에 받을 링버퍼 포인터 넣기 
+				//링버퍼 경계 걸치는 지 확인후 추가로 버퍼포인터 넣을지 결정 
+
+				int dirdequesize = session->sendQ.DirectDequesize();
+
+				if (dirdequesize == 0 || usesize == 0)
+				{
+					LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"recvpost size 0 free -  %d , dir %d ", usesize, dirdequesize);
+				}
+
+
+				int sendbufcount = usesize / 8;
+
+				for (int i = 0; i < sendbufcount; i++)
+				{
+					cMassage* msg;
+					if (-1 != session->sendQ.NextPeek((BYTE*)&msg, 8, sendbufcount))
+					{
+						sendwsabuf[i].buf = (char*)msg->GetHeaderbufferptr();
+						sendwsabuf[i].len = msg->GetHeaderusesize();
+					}
+					else
+					{
+						sendbufcount = i;
+					}
+				}
+				session->sendQ.setsendcount(sendbufcount);
+				InterlockedAdd(&SendCount, sendbufcount);
+
+
+				ZeroMemory(&session->sendoverlap.overlap, sizeof(session->sendoverlap.overlap));
+				DWORD sendretbyte = 0;
+
+
+				if (InterlockedIncrement((LONG*)&session->IOcount) == 1)
+				{
+					InterlockedDecrement((LONG*)&session->IOcount);
+					break;
+				}
+
+				session->startsend = timeGetTime();
+				int retsend = WSASend(session->socket, sendwsabuf, sendbufcount, &sendretbyte, 0, (OVERLAPPED*)&session->sendoverlap, NULL);
+				DWORD endtime = timeGetTime();
+				if ((endtime - session->startsend)<2)
+				{
+					sendPlustime += (timeGetTime() - session->startsend);
+					InterlockedIncrement(&sendpluscounttime);
+				}
+
+				
+				if (retsend == SOCKET_ERROR)
+				{
+					if (WSAGetLastError() != WSA_IO_PENDING)
+					{
+						//오류 
+						if (0 == InterlockedDecrement((LONG*)&session->IOcount))
+						{
+							DeleteSession(session);
+						}
+
+						InterlockedExchange((LONG*)&session->bSend, 0);
+						break;
+					}
+
+				}
+
+
+			}
+
+		
 		}
 		else
+		{
 			break;
+		}
+
 
 	} while (0);
 
-	//최대크기 
-	WSABUF sendwsabuf[1000];
-	//wsabuf  에 받을 링버퍼 포인터 넣기 
-	//링버퍼 경계 걸치는 지 확인후 추가로 버퍼포인터 넣을지 결정 
-
-	int dirdequesize = session->sendQ.DirectDequesize();
-
-	if (dirdequesize == 0 || usesize == 0)
-	{
-		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"recvpost size 0 free -  %d , dir %d ", usesize, dirdequesize);
-	}
 	
-
-	int sendbufcount = usesize / 8;
-	
-	for (int i = 0; i < sendbufcount; i++)
-	{
-		cMassage* msg;
-		if (-1 != session->sendQ.NextPeek((BYTE*)&msg, 8, sendbufcount))
-		{
-			sendwsabuf[i].buf = (char*)msg->GetHeaderbufferptr();
-			sendwsabuf[i].len = msg->GetHeaderusesize();
-		}
-		else
-		{
-			sendbufcount = i;
-		}
-	}
-	session->sendQ.setsendcount(sendbufcount);
-
-
-
-	ZeroMemory(&session->sendoverlap.overlap, sizeof(session->sendoverlap.overlap));
-	DWORD sendretbyte = 0;
-
-
-	if(InterlockedIncrement((LONG*)&session->IOcount) == 1)
-	{
-		InterlockedDecrement((LONG*)&session->IOcount);
-		return;
-	}
-
-	int retsend = WSASend(session->socket, sendwsabuf, sendbufcount, &sendretbyte, 0, (OVERLAPPED*)&session->sendoverlap, NULL);
-	if (retsend == SOCKET_ERROR)
-	{
-		if (WSAGetLastError() != WSA_IO_PENDING)
-		{
-			//오류 
-			if (0 == InterlockedDecrement((LONG*)&session->IOcount)) 
-			{
-				DeleteSession(session);
-			}
-
-			InterlockedExchange((LONG*)&session->bSend, 0);
-			return;
-		}
-
-	}
-
 	return;
 }
 
@@ -631,7 +689,7 @@ void cNetworkLib::InputSession(stSession * session)
 	AcquireSRWLockExclusive(&map_cs);
 
 	sessionMap.insert(std::make_pair(session->sessionKey, session));
-
+	InterlockedIncrement(&ConnectSessioncount);
 	ReleaseSRWLockExclusive(&map_cs);
 }
 
@@ -645,6 +703,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 
 	AcquireSRWLockExclusive(&map_cs);
 	sessionMap.erase(session->sessionKey);
+	InterlockedDecrement(&ConnectSessioncount);
 	ReleaseSRWLockExclusive(&map_cs);
 	
 	EnterCriticalSection(&session->cs);
@@ -660,9 +719,9 @@ void cNetworkLib::DeleteSession(stSession * session)
 	int sendcount = session->sendQ.Getquesize()/8;
 	for (int i = 0; i < sendcount; i++)
 	{
-		cMassage* msg;
-		session->sendQ.Deque((BYTE*)&msg, sizeof(msg));
-		delete msg;
+		cMassage* packet;
+		session->sendQ.Deque((BYTE*)&packet, sizeof(packet));
+		packet->Free();
 	}
 
 
@@ -679,6 +738,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 	session->type = release;
 
 	LeaveCriticalSection(&session->cs);
+
 
 	ReleaseSession(session);
 

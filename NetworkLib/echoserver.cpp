@@ -5,7 +5,7 @@
 void cEchoserver::onRecv(__int64 sessionKey, cMassage* msg)
 {
 
-	cMassage* cmsg = new cMassage;
+	cMassage* cmsg = cMassage::Alloc();
 
 	*cmsg = *msg;
 
@@ -14,7 +14,7 @@ void cEchoserver::onRecv(__int64 sessionKey, cMassage* msg)
 
 void cEchoserver::onClientJoin(__int64 sessionKey)
 {
-	cMassage* msg = new cMassage;
+	cMassage* msg = cMassage::Alloc();
 
 	__int64 data = 0x7fffffffffffffff;
 

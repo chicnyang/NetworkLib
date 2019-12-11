@@ -5,36 +5,19 @@
 
 class cMassage
 {
-private:
 
-	BYTE* pBuf;
-	int front;
-	int rear;
-	HANDLE hHeap;
-	BYTE* msgptr;
-	BYTE* pHeader;
-	int headersize;
 
-	//헤더 세팅 함수 
-	void settingHeader(int byte);
-
-	friend class  cNetworkLib;
 
 public:
-	enum eMassage  //define -> 모든 소스파일에서 사용 enum 으로 클래스 함수 안에서만 사용 public 으로 밖에서 접근시 값확인만 가능 
-	{
-		eBuffer_defaultsize = 1000  //버퍼 기본사이즈
-	};
-	
-	cMassage();
-	//cMassage(int ibufsize);
-
-	virtual ~cMassage() { Release(); }
-	void resize(int size);
 
 
-	//메시지 파괴  -  버퍼 지우기 
-	void Release(void);
+
+	static void MemoryPool(int size = 0);
+
+	static cMassage* Alloc();
+
+	void Free();
+
 
 	//메시지 청소  -  버퍼 비우기 
 	void Clear(void);
@@ -87,7 +70,6 @@ public:
 	cMassage &operator >> (double &bValue);
 	cMassage &operator >> (__int64 &bValue);
 
-
 	//데이터 얻기 
 	int GetData(BYTE *Dest, int iSize);
 
@@ -97,11 +79,53 @@ public:
 	//빼다가 오류 났는지 확인
 	BOOL sizeerr();
 
-protected:
+	static cMemoryPool<cMassage>* packetPool;
+
+	static int GetUsePacket();
+	static int GetsizePacketPool();
+
+
+private:
+
+	BYTE* pBuf;
+	int front;
+	int rear;
+	BYTE* msgptr;
+	BYTE* pHeader;
+	int headersize;
+
+	//헤더 세팅 함수 
+	void settingHeader(int byte);
+	friend class  cNetworkLib;
+	friend class  cMemoryPool<cMassage>;
+
+
+	cMassage();
+	//cMassage(int ibufsize);
+	virtual ~cMassage() { Release(); }
+
+
+	enum eMassage  //define -> 모든 소스파일에서 사용 enum 으로 클래스 함수 안에서만 사용 public 으로 밖에서 접근시 값확인만 가능 
+	{
+		eBuffer_defaultsize = 1000  //버퍼 기본사이즈
+	};
+
+	void resize(int size);
+
+	//메시지 파괴  -  버퍼 지우기 
+	void Release(void);
+
 	//버퍼 사용중인 사이즈 
 	int bufUsesize=0;
 	//버퍼 총 사이즈 
 	int bufsize;
+
+
+
+
+
+
+
 
 	//사이즈 오류 플래그
 	BOOL bSizenotuse = false;

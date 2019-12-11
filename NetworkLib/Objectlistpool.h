@@ -205,7 +205,7 @@ public:
 	cMemoryPool(int poolsize, bool bcreatecall = false)
 	{
 
-		InitializeSRWLock(&_poolsrw);
+
 
 
 		hHeap = HeapCreate(0, 0, 0);
@@ -245,7 +245,6 @@ public:
 	//alloc
 	Data* alloc(void)
 	{
-		AcquireSRWLockExclusive(&_poolsrw);
 
 		Node* node = nullptr;
 		//없으면 더 만들기
@@ -282,7 +281,6 @@ public:
 
 		InterlockedIncrement(&use_count);
 
-		ReleaseSRWLockExclusive(&_poolsrw);
 		return &retnod->mydata;
 
 	}
@@ -291,20 +289,20 @@ public:
 	//free
 	BOOL free(Data* pData)
 	{
-		AcquireSRWLockExclusive(&_poolsrw);
+
 		Node* inNode = (Node*)((char*)pData - sizeof(unsigned int));
 
 
 		//가득차있다면 false
 		if (use_count == 0)
 		{
-			ReleaseSRWLockExclusive(&_poolsrw);
+
 			//예외발생
 			return false;
 		}
 		if (inNode->endCHKsum != CHKSUM || inNode->frontCHKsum != CHKSUM)
 		{
-			ReleaseSRWLockExclusive(&_poolsrw);
+
 			//예외발생 
 			return false;
 		}
@@ -337,7 +335,7 @@ public:
 		InterlockedDecrement(&use_count);
 
 
-		ReleaseSRWLockExclusive(&_poolsrw);
+
 		return true;
 
 	}
@@ -382,7 +380,7 @@ private:
 	BOOL createcall;
 	HANDLE hHeap;
 
-	SRWLOCK _poolsrw;
+
 
 	// 스택 방식으로 반환된 (미사용) 오브젝트 블럭을 관리.
 

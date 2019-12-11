@@ -4,8 +4,8 @@
 
 #define SERVERPORT 6000
 
-
-
+long cDump::dumpcount;
+cDump dump;
 int main()
 {
 	cEchoserver server;
@@ -54,9 +54,9 @@ int main()
 		wprintf(L"Accept Total Session    : %ld \n", server.AcceptTotalCount);
 		wprintf(L"Accept TPS		: %d \n", server.AcceptCount);
 		wprintf(L"Recv TPS		: %d \n", server.RecvCount);
-		if (server.RecvCount < 70000)
+		if (server.RecvCount < 70000 && server.RecvCount>10000)
 		{
-
+			dump.Crash();
 		}
 		wprintf(L"Send TPS		: %d \n", server.SendCount);
 		wprintf(L"Use Packet Count	: %d \n", cMassage::GetUsePacket());

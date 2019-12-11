@@ -1,7 +1,7 @@
 ﻿#include "pch.h"
 
 cMemoryPool<cMassage>* cMassage::packetPool;
-
+SRWLOCK cMassage::_poolsrw;
 cMassage::cMassage()
 {
 	//hHeap = HeapCreate(0,0,0);
@@ -87,19 +87,24 @@ void cMassage::Release(void)
 
 void cMassage::MemoryPool(int size)
 {
+	InitializeSRWLock(&_poolsrw);
 	packetPool = new cMemoryPool<cMassage>(size);
 }
 
 cMassage * cMassage::Alloc()
 {
+	AcquireSRWLockExclusive(&_poolsrw);
 	cMassage* msg = packetPool->alloc();
+	ReleaseSRWLockExclusive(&_poolsrw);
 	msg->Clear();
 	return msg;
 }
 
 void cMassage::Free()
 {
+	AcquireSRWLockExclusive(&_poolsrw);
 	packetPool->free(this);
+	ReleaseSRWLockExclusive(&_poolsrw);
 }
 
 //메시지 청소  -  버퍼 비우기 

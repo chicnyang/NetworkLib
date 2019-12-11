@@ -14,7 +14,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <Windows.h>
-
+#include "DumpFile.h"
 #include <unordered_map>
 #include <process.h>
 //#include <vld.h>

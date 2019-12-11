@@ -10,7 +10,7 @@ class cMassage
 
 public:
 
-
+	static SRWLOCK _poolsrw;
 
 	static void MemoryPool(int size = 0);
 

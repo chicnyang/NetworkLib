@@ -21,6 +21,7 @@
 #include "RingbufferQue.h"
 //#include "RingBuffer.h"
 #include "logfile.h"
+#include "Objectlistpool.h"
 #include "NetworkLib.h"
 #include "echoServer.h"
 //#include "LogSystem.h"

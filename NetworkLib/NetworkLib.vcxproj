@@ -161,6 +161,7 @@
     <ClInclude Include="echoServer.h" />
     <ClInclude Include="logfile.h" />
     <ClInclude Include="NetworkLib.h" />
+    <ClInclude Include="Objectlistpool.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="RingbufferQue.h" />
   </ItemGroup>

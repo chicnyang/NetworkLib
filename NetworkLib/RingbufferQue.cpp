@@ -261,10 +261,6 @@ int cRingbuffer::NextPeek(BYTE* Destbuf, int isize, int pCount)
 		return -1;
 
 
-
-
-
-
 	if (!peeknext)
 	{
 		nextcount = pCount;

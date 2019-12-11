@@ -67,12 +67,17 @@ protected:
 
 		CRITICAL_SECTION cs;
 
-		DWORD IOcount;
+		LONG IOcount;
 
 		LONG bSend;
 		LONG bClose;
 
 		DWORD type;
+
+		LONG debugcount;
+		char debug[100000];
+
+
 
 	};
 

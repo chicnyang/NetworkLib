@@ -2,6 +2,10 @@
 
 cMemoryPool<cMassage>* cMassage::packetPool;
 
+ LONG cMassage::debugcount;
+ char cMassage::debugbuf[10000];
+
+
 cMassage::cMassage()
 {
 	//hHeap = HeapCreate(0,0,0);
@@ -87,6 +91,8 @@ void cMassage::Release(void)
 
 void cMassage::MemoryPool(int size)
 {
+	debugcount = 0;
+	ZeroMemory(debugbuf, sizeof(debugbuf));
 	packetPool = new cMemoryPool<cMassage>(size);
 }
 

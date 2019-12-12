@@ -208,6 +208,7 @@ public:
 		InitializeSRWLock(&_poolsrw);
 
 
+
 		hHeap = HeapCreate(0, 0, 0);
 		createcall = bcreatecall;
 		alloc_count = poolsize;
@@ -247,6 +248,14 @@ public:
 	{
 		AcquireSRWLockExclusive(&_poolsrw);
 
+		cMassage::debugbuf[cMassage::debugcount] = 'L';
+		if (InterlockedIncrement(&cMassage::debugcount) == 10000)
+		{
+			InterlockedExchange(&cMassage::debugcount,0);
+		}
+			
+
+
 		Node* node = nullptr;
 		//없으면 더 만들기
 		if (alloc_count == use_count)
@@ -283,6 +292,13 @@ public:
 		InterlockedIncrement(&use_count);
 
 		ReleaseSRWLockExclusive(&_poolsrw);
+
+		cMassage::debugbuf[cMassage::debugcount] = 'R';
+		if (InterlockedIncrement(&cMassage::debugcount) == 10000)
+		{
+			InterlockedExchange(&cMassage::debugcount, 0);
+		}
+
 		return &retnod->mydata;
 
 	}
@@ -292,6 +308,14 @@ public:
 	BOOL free(Data* pData)
 	{
 		AcquireSRWLockExclusive(&_poolsrw);
+
+
+		cMassage::debugbuf[cMassage::debugcount] = 'L';
+		if (InterlockedIncrement(&cMassage::debugcount) == 10000)
+		{
+			InterlockedExchange(&cMassage::debugcount, 0);
+		}
+
 		Node* inNode = (Node*)((char*)pData - sizeof(unsigned int));
 
 
@@ -338,6 +362,13 @@ public:
 
 
 		ReleaseSRWLockExclusive(&_poolsrw);
+
+		cMassage::debugbuf[cMassage::debugcount] = 'R';
+		if (InterlockedIncrement(&cMassage::debugcount) == 10000)
+		{
+			InterlockedExchange(&cMassage::debugcount, 0);
+		}
+
 		return true;
 
 	}
@@ -383,6 +414,8 @@ private:
 	HANDLE hHeap;
 
 	SRWLOCK _poolsrw;
+
+
 
 	// 스택 방식으로 반환된 (미사용) 오브젝트 블럭을 관리.
 

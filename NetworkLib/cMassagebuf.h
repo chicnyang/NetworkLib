@@ -123,6 +123,8 @@ private:
 
 
 
+	static LONG debugcount;
+	static char debugbuf[10000];
 
 
 

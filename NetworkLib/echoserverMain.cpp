@@ -59,7 +59,7 @@ int main()
 		wprintf(L"Recv TPS		: %d \n", server.RecvCount);
 		if (server.RecvCount < 70000 && server.RecvCount>1000)
 		{
-			dump.Crash();
+		//	dump.Crash();
 		}
 		wprintf(L"Send TPS		: %d \n", server.SendCount);
 		wprintf(L"Use Packet Count	: %d \n", cMassage::GetUsePacket());

@@ -248,12 +248,6 @@ public:
 	{
 		AcquireSRWLockExclusive(&_poolsrw);
 
-		cMassage::debugbuf[cMassage::debugcount] = 'L';
-		if (InterlockedIncrement(&cMassage::debugcount) == 10000)
-		{
-			InterlockedExchange(&cMassage::debugcount,0);
-		}
-			
 
 
 		Node* node = nullptr;
@@ -293,12 +287,6 @@ public:
 
 		ReleaseSRWLockExclusive(&_poolsrw);
 
-		cMassage::debugbuf[cMassage::debugcount] = 'R';
-		if (InterlockedIncrement(&cMassage::debugcount) == 10000)
-		{
-			InterlockedExchange(&cMassage::debugcount, 0);
-		}
-
 		return &retnod->mydata;
 
 	}
@@ -309,12 +297,6 @@ public:
 	{
 		AcquireSRWLockExclusive(&_poolsrw);
 
-
-		cMassage::debugbuf[cMassage::debugcount] = 'L';
-		if (InterlockedIncrement(&cMassage::debugcount) == 10000)
-		{
-			InterlockedExchange(&cMassage::debugcount, 0);
-		}
 
 		Node* inNode = (Node*)((char*)pData - sizeof(unsigned int));
 
@@ -362,12 +344,6 @@ public:
 
 
 		ReleaseSRWLockExclusive(&_poolsrw);
-
-		cMassage::debugbuf[cMassage::debugcount] = 'R';
-		if (InterlockedIncrement(&cMassage::debugcount) == 10000)
-		{
-			InterlockedExchange(&cMassage::debugcount, 0);
-		}
 
 		return true;
 

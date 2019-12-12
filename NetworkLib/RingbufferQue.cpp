@@ -15,6 +15,7 @@ cRingbuffer::cRingbuffer()
 	start = (BYTE*)malloc(erBuffer_defaultsize);
 
 	front = rear = 0;
+	peekfront = 0;
 	bufsize = erBuffer_defaultsize;
 
 	memset(start, 0, bufsize);
@@ -260,19 +261,6 @@ int cRingbuffer::NextPeek(BYTE* Destbuf, int isize, int pCount)
 	if (start == NULL)
 		return -1;
 
-
-	if (!peeknext)
-	{
-		nextcount = pCount;
-		peekfront = front;
-		peeknext = true;
-	}
-	if (peekfront == rear || nextcount == 0)
-	{
-		peeknext = false;
-		return -1;
-	}
-
 	//디큐에서 front 위치만 안옮기기
 	int usesize = Getquepeeksize();
 	//뺄만큼 데이터 없거나 있을때. 
@@ -289,15 +277,7 @@ int cRingbuffer::NextPeek(BYTE* Destbuf, int isize, int pCount)
 	}
 
 	peekfront = (peekfront + isize) % bufsize;
-
-	nextcount--;
 	
-
-	if (peekfront == rear || nextcount == 0)
-	{
-		peeknext = false;
-	}
-
 	return isize;
 
 }
@@ -360,7 +340,7 @@ void cRingbuffer::Clearbuf(void)//모든 데이터 삭제
 
 	front =0;
 	rear = 0;
-
+	peekfront = 0;
 }
 
 BYTE* cRingbuffer::Getbufptr(void)

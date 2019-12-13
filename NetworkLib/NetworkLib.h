@@ -102,6 +102,7 @@ protected:
 	virtual void onRecv(__int64 sessionKey, cMassage* msg) PURE;
 	virtual void onClientJoin(__int64 sessionKey) PURE;
 	virtual void onClientLeave() PURE;
+	//virtual bool OnConnectionRequest(const char* clientIP,int Port) PURE;
 
 private:
 

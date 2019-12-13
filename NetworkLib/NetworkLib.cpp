@@ -304,6 +304,10 @@ void cNetworkLib::AcceptLoop()
 		char ip[20] = { 0 };
 		inet_ntop(AF_INET, &(clientaddr.sin_addr), ip, 20);
 
+	/*	if (!OnConnectionRequest(ip, ntohs(clientaddr.sin_port)))
+		{
+			closesocket(sock);
+		}*/
 
 		//세션정보 넣기 
 
@@ -331,7 +335,6 @@ void cNetworkLib::AcceptLoop()
 
 		if (RecvPost(session))
 		{
-
 			onClientJoin(session->sessionKey);
 		}
 

@@ -106,19 +106,15 @@ cMassage * cMassage::Alloc()
 
 void cMassage::Free()
 {
-	if (InterlockedDecrement(&refcount) == 1)
+	if (InterlockedDecrement(&refcount) == 0)
 	{
-		InterlockedDecrement(&refcount);
 		packetPool->free(this);
 	}
-
-	int a = 0;
 }
 
 //메시지 청소  -  버퍼 비우기 
 void cMassage::Clear(void)
 {
-	refcount = 0;
 	front = 0;
 	rear = 0;
 	bufUsesize = 0;
@@ -538,8 +534,11 @@ int cMassage::GetsizePacketPool()
 void cMassage::refcntUp()
 {
 	InterlockedIncrement(&refcount);
+}
 
-
+void cMassage::refcntDown()
+{
+	InterlockedDecrement(&refcount);
 }
 
 int cMassage::GetHeaderusesize(void)

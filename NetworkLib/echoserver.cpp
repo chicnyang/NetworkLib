@@ -10,6 +10,8 @@ void cEchoserver::onRecv(__int64 sessionKey, cMassage* msg)
 	*cmsg = *msg;
 
 	SendPacket(sessionKey, cmsg);
+
+	cmsg->Free();
 }
 
 void cEchoserver::onClientJoin(__int64 sessionKey)
@@ -20,7 +22,9 @@ void cEchoserver::onClientJoin(__int64 sessionKey)
 
 	*msg << data;
 
-	SendPacket(sessionKey, msg);
+	SendPacket(sessionKey, msg); 
+
+	msg->Free();
 
 }
 void cEchoserver::onClientLeave()

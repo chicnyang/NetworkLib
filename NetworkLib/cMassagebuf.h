@@ -82,7 +82,7 @@ public:
 
 
 	void refcntUp();
-
+	void refcntDown();
 
 private:
 

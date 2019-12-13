@@ -266,6 +266,11 @@ int cRingbuffer::NextPeek(BYTE* Destbuf, int isize, int pCount)
 	//뺄만큼 데이터 없거나 있을때. 
 	int dirsize = DirectDequepeeksize(); //한번에 뺄수 있는 용량 
 
+
+	if (usesize < isize)
+		return 0;
+
+
 	if (isize <= dirsize)  //한번에 뺄수 있음. 
 	{
 		memcpy_s(Destbuf, isize, start + peekfront, isize); //카피

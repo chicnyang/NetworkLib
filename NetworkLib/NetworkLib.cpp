@@ -294,7 +294,7 @@ void cNetworkLib::AcceptLoop()
 		}
 
 		int optval = 0;
-		setsockopt(sock,SOL_SOCKET,SO_SNDBUF,(const char*)&optval,sizeof(optval));
+		//setsockopt(sock,SOL_SOCKET,SO_SNDBUF,(const char*)&optval,sizeof(optval));
 
 		AcceptCount++;
 		AcceptTotalCount++;
@@ -378,6 +378,7 @@ void cNetworkLib::WorkerLoop()
 			//전송량 확인
 			if (transbyte == 0)
 			{
+				dump.Crash();
 				//mysession->socket = INVALID_SOCKET;
 				break;
 			}
@@ -614,7 +615,7 @@ void cNetworkLib::SendPost(stSession* session)
 
 				ZeroMemory(&session->sendoverlap.overlap, sizeof(session->sendoverlap.overlap));
 				DWORD sendretbyte = 0;
-
+				session->sendoverlap.sendcount = sendbufcount;
 
 				if (InterlockedIncrement((LONG*)&session->IOcount) == 1)
 				{

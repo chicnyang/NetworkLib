@@ -262,7 +262,8 @@ public:
 			node->Nextnode = freenode;
 			new(&node->mydata) Data();
 			freenode = node;
-			InterlockedIncrement(&alloc_count);
+		//	InterlockedIncrement(&alloc_count);
+			alloc_count++;
 		}
 
 		Node* retnod = nullptr;
@@ -277,7 +278,8 @@ public:
 			new(&retnod->mydata) Data();
 		}
 
-		InterlockedIncrement(&use_count);
+	//	InterlockedIncrement(&use_count);
+		use_count++;
 
 		ReleaseSRWLockExclusive(&_poolsrw);
 
@@ -328,8 +330,8 @@ public:
 			freenode->Nextnode = savenode;
 
 		}
-		InterlockedDecrement(&use_count);
-
+		//InterlockedDecrement(&use_count);
+		--use_count;
 
 		ReleaseSRWLockExclusive(&_poolsrw);
 

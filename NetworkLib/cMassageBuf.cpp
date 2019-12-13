@@ -99,8 +99,8 @@ void cMassage::MemoryPool(int size)
 cMassage * cMassage::Alloc()
 {
 	cMassage* msg = packetPool->alloc();
-	msg->Clear();
 	msg->refcntUp();
+	msg->Clear();
 	return msg;
 }
 

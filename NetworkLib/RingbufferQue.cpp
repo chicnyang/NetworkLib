@@ -5,7 +5,7 @@
 
 
 
-
+extern cDump dump;
 cRingbuffer::cRingbuffer()
 {
 	//동적할당 초기화 
@@ -274,13 +274,6 @@ int cRingbuffer::NextPeek(BYTE* Destbuf, int isize, int pCount)
 
 	peekfront = (peekfront + isize) % bufsize;
 
-	nextcount--;
-	
-
-	if (peekfront == rear || nextcount == 0)
-	{
-		peeknext = false;
-	}
 
 	return isize;
 
@@ -288,6 +281,10 @@ int cRingbuffer::NextPeek(BYTE* Destbuf, int isize, int pCount)
 
 void cRingbuffer::setsendcount(int count)
 {
+	if (count > 1000)
+	{
+		dump.Crash();
+	}
 	sendcount = count;
 	return;
 }

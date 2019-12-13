@@ -69,6 +69,7 @@ protected:
 	{
 		WSAOVERLAPPED overlap;
 		BYTE mode; //send 인지 recv 인지 구별
+		int sendcount;
 	};
 
 	//session

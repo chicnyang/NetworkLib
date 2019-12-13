@@ -163,7 +163,7 @@ int cRingbuffer::Enque(const BYTE* data, int isize)
 
 
 	if (freesize < isize)
-		return 0;
+		return -1;
 
 
 
@@ -173,21 +173,12 @@ int cRingbuffer::Enque(const BYTE* data, int isize)
 	{
 		memcpy_s(start+ rear, isize, data, isize); //카피
 
-		//if (rear + isize == bufsize)
-		//	rear = 0;
-		//else
-		//	rear += isize;
-
-		 
-		//return isize;
 	}
 	else //한번에 못넣을때-> 경계만나는 경우 + 데이터 쓸 공간 작을때.
 	{
 		memcpy_s(start + rear, dirsize, data, dirsize); //카피
 		memcpy_s(start, isize - dirsize, data + dirsize, isize - dirsize);
 
-		//rear = isize - dirsize;
-		//return isize;
 	}
 
 
@@ -316,7 +307,7 @@ int cRingbuffer::Moverear(int isize)
 
 
 	if (freesize < isize)
-		return 0;
+		return -1;
 
 
 	rear = (rear + isize) % bufsize;

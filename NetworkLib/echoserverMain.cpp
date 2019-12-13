@@ -4,8 +4,7 @@
 
 #define SERVERPORT 6000
 
-long cDump::dumpcount;
-cDump dump;
+
 
 
 
@@ -54,7 +53,7 @@ int main()
 		wprintf(L"//=================================================================//\n");
 		wprintf(L"//=================================================================//\n\n");
 		wprintf(L"Connect Session		: %d \n", server.ConnectSessioncount);
-		wprintf(L"Accept Total Session    : %ld \n", server.AcceptTotalCount);
+		wprintf(L"Accept Total Session    : %lld \n", server.AcceptTotalCount);
 		wprintf(L"Accept TPS		: %d \n", server.AcceptCount);
 		wprintf(L"Recv TPS		: %d \n", server.RecvCount);
 		if (server.RecvCount < 70000 && server.RecvCount>1000)

@@ -17,7 +17,7 @@ cMassage::cMassage()
 
 	front = 0;
 	rear = 0;
-
+	refcount = 0;
 	bufsize = eBuffer_defaultsize;
 }
 //cMassage::cMassage(int ibufsize)
@@ -100,17 +100,25 @@ cMassage * cMassage::Alloc()
 {
 	cMassage* msg = packetPool->alloc();
 	msg->Clear();
+	msg->refcntUp();
 	return msg;
 }
 
 void cMassage::Free()
 {
-	packetPool->free(this);
+	if (InterlockedDecrement(&refcount) == 1)
+	{
+		InterlockedDecrement(&refcount);
+		packetPool->free(this);
+	}
+
+	int a = 0;
 }
 
 //메시지 청소  -  버퍼 비우기 
 void cMassage::Clear(void)
 {
+	refcount = 0;
 	front = 0;
 	rear = 0;
 	bufUsesize = 0;
@@ -525,6 +533,13 @@ int cMassage::GetUsePacket()
 int cMassage::GetsizePacketPool()
 {
 	return packetPool->alloccount();
+}
+
+void cMassage::refcntUp()
+{
+	InterlockedIncrement(&refcount);
+
+
 }
 
 int cMassage::GetHeaderusesize(void)

@@ -193,6 +193,10 @@ class objectListPool
 #define ALLOCSIZE 1000
 #define CHKSUM 0x79ffff79
 
+
+extern cDump dump;
+
+
 template <class Data>
 class cMemoryPool
 {
@@ -206,7 +210,6 @@ public:
 	{
 
 		InitializeSRWLock(&_poolsrw);
-
 
 
 		hHeap = HeapCreate(0, 0, 0);
@@ -226,6 +229,7 @@ public:
 			{
 				endnode = node;
 			}
+
 			//heap 으로 메모리만 잡았기 때문에 클래스 생성자 호출안됨 
 			node->frontCHKsum = CHKSUM;
 			node->endCHKsum = CHKSUM;
@@ -248,19 +252,10 @@ public:
 	{
 		AcquireSRWLockExclusive(&_poolsrw);
 
-
-
 		Node* node = nullptr;
 		//없으면 더 만들기
 		if (alloc_count == use_count)
 		{
-			/*Node* node = (Node*)HeapAlloc(hHeap, 0, sizeof(Node));
-			node->frontCHKsum = CHKSUM;
-			node->endCHKsum = CHKSUM;
-			node->Nextnode = freenode;
-			freenode = node;
-			InterlockedIncrement(&alloc_count);*/
-
 			node = (Node*)HeapAlloc(hHeap, 0, sizeof(Node));
 			node->frontCHKsum = CHKSUM;
 			node->endCHKsum = CHKSUM;
@@ -272,7 +267,6 @@ public:
 
 		Node* retnod = nullptr;
 		//생성자 호출할지 여부 파악후 리턴 
-
 
 		retnod = freenode;
 		freenode = retnod->Nextnode;
@@ -290,7 +284,6 @@ public:
 		return &retnod->mydata;
 
 	}
-	// p = malloc(sizeof(Node) + sizeof(Data));
 
 	//free
 	BOOL free(Data* pData)
@@ -305,13 +298,16 @@ public:
 		if (use_count == 0)
 		{
 			ReleaseSRWLockExclusive(&_poolsrw);
+
 			//예외발생
+			dump.Crash();
 			return false;
 		}
 		if (inNode->endCHKsum != CHKSUM || inNode->frontCHKsum != CHKSUM)
 		{
 			ReleaseSRWLockExclusive(&_poolsrw);
 			//예외발생 
+			dump.Crash();
 			return false;
 		}
 
@@ -320,25 +316,17 @@ public:
 		{
 			//소멸자 호출 
 			inNode->mydata.~Data();
-			//freenode->Nextnode = inNode;
 			Node* savenode = freenode;
 			freenode = inNode;
 			freenode->Nextnode = savenode;
-
-			//endnode->Nextnode = inNode;
-			//inNode->Nextnode = nullptr;
-			//endnode = inNode;
 		}
 		else
 		{
 			//소멸자 x
-			//freenode->Nextnode = inNode;
 			Node* savenode = freenode;
 			freenode = inNode;
 			freenode->Nextnode = savenode;
-			//endnode->Nextnode = inNode;
-			//inNode->Nextnode = nullptr;
-			//endnode = inNode;
+
 		}
 		InterlockedDecrement(&use_count);
 
@@ -367,7 +355,7 @@ public:
 private:
 
 	//다음 노드의 포인터
-#pragma pack(1)
+#pragma pack(push, 1)
 	struct Node
 	{
 		Node()
@@ -380,7 +368,7 @@ private:
 		Node* Nextnode;
 		unsigned int endCHKsum;
 	};
-#pragma pop
+#pragma pack(pop)
 
 	LONG alloc_count;
 	LONG use_count;
@@ -391,9 +379,6 @@ private:
 
 	SRWLOCK _poolsrw;
 
-
-
-	// 스택 방식으로 반환된 (미사용) 오브젝트 블럭을 관리.
 
 };
 

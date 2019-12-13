@@ -76,6 +76,7 @@ protected:
 	{
 		SOCKADDR_IN sockaddr;
 		SOCKET		socket;
+		SOCKET		closesock;
 
 		__int64		sessionKey;
 
@@ -145,6 +146,7 @@ private:
 	void DeleteSession(stSession * session);
 	stSession* FindSession(__int64 sessionKey);
 
+	void CancelSession(stSession* session);
 
 
 	int countalloc = 0;

@@ -6,11 +6,7 @@
 class cMassage
 {
 
-
-
 public:
-
-
 
 	static void MemoryPool(int size = 0);
 
@@ -85,6 +81,9 @@ public:
 	static int GetsizePacketPool();
 
 
+	void refcntUp();
+
+
 private:
 
 	BYTE* pBuf;
@@ -120,7 +119,7 @@ private:
 	//버퍼 총 사이즈 
 	int bufsize;
 
-
+	LONG refcount;
 
 
 	static LONG debugcount;

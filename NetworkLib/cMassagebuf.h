@@ -123,11 +123,11 @@ private:
 	LONG refcount;
 
 
-	static LONG debugcount;
-	static char debugbuf[10000];
+	//static LONG debugcount;
+	//static char debugbuf[10000];
 
-	int packetcount=0;
-	char packetdebug[1000] = {0,};
+	//int packetcount=0;
+	//char packetdebug[1000] = {0,};
 
 	BOOL sendflag = false;
 

@@ -2,8 +2,8 @@
 
 cMemoryPool<cMassage>* cMassage::packetPool;
 
- LONG cMassage::debugcount;
- char cMassage::debugbuf[10000];
+// LONG cMassage::debugcount;
+ //char cMassage::debugbuf[10000];
 
 
 cMassage::cMassage()
@@ -97,8 +97,8 @@ void cMassage::Release(void)
 
 void cMassage::MemoryPool(int size)
 {
-	debugcount = 0;
-	ZeroMemory(debugbuf, sizeof(debugbuf));
+	//debugcount = 0;
+	//ZeroMemory(debugbuf, sizeof(debugbuf));
 	packetPool = new cMemoryPool<cMassage>(size);
 }
 
@@ -118,12 +118,12 @@ cMassage * cMassage::Alloc()
 
 void cMassage::Free()
 {
-	++packetcount;
-	if (packetcount == 1000)
-	{
-		packetcount = 0;
-	}
-	packetdebug[packetcount] = 'f';
+	//++packetcount;
+	//if (packetcount == 1000)
+	//{
+	//	packetcount = 0;
+	//}
+	//packetdebug[packetcount] = 'f';
 
 
 	if (InterlockedDecrement(&refcount) == 0)
@@ -199,12 +199,12 @@ int cMassage::MoveReadpos(int pos)
 //연산자 오버로딩 넣기 빼기
 cMassage &cMassage::operator = (cMassage &srcMassage)
 {
-	++packetcount;
-	if (packetcount == 1000)
-	{
-		packetcount = 0;
-	}
-	packetdebug[packetcount] = '=';
+	//++packetcount;
+	//if (packetcount == 1000)
+	//{
+	//	packetcount = 0;
+	//}
+	//packetdebug[packetcount] = '=';
 
 	cMassage *pMsg = &srcMassage;
 
@@ -569,12 +569,12 @@ int cMassage::GetsizePacketPool()
 
 void cMassage::refcntUp()
 {
-	++packetcount;
-	if (packetcount == 1000)
-	{
-		packetcount = 0;
-	}
-	packetdebug[packetcount] = 'u';
+	//++packetcount;
+	//if (packetcount == 1000)
+	//{
+	//	packetcount = 0;
+	//}
+	//packetdebug[packetcount] = 'u';
 
 	if (InterlockedIncrement(&refcount) == 0)
 		dump.Crash();
@@ -582,12 +582,12 @@ void cMassage::refcntUp()
 
 void cMassage::refcntDown()
 {
-	++packetcount;
-	if (packetcount == 1000)
-	{
-		packetcount = 0;
-	}
-	packetdebug[packetcount] = 'd';
+	//++packetcount;
+	//if (packetcount == 1000)
+	//{
+	//	packetcount = 0;
+	//}
+	//packetdebug[packetcount] = 'd';
 	if(InterlockedDecrement(&refcount) < 0)
 		dump.Crash();
 }

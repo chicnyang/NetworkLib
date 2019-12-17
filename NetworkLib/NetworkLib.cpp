@@ -389,7 +389,7 @@ void cNetworkLib::WorkerLoop()
 			//전송량 확인
 			if (transbyte == 0)
 			{
-				dump.Crash();
+				//dump.Crash();
 				//mysession->socket = INVALID_SOCKET;
 				break;
 			}

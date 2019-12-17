@@ -7,7 +7,15 @@ void cEchoserver::onRecv(__int64 sessionKey, cMassage* msg)
 
 	cMassage* cmsg = cMassage::Alloc();
 
-	*cmsg = *msg;
+	__int64 data;
+
+	*msg >> data;
+
+	*cmsg << data;
+	if (cmsg->Getusesize() < 8)
+	{
+		dump.Crash();
+	}
 
 	SendPacket(sessionKey, cmsg);
 

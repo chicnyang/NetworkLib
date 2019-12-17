@@ -19,14 +19,22 @@ cNetworkLib::~cNetworkLib()
 
 void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 {
+
+	if (packet->refcount != 1)
+	{
+		dump.Crash();
+	}
+
+
 	packet->settingHeader(2);
+
+
 
 
 
 	stSession* session = FindSession(sessionKey);
 	if (session == NULL)
 	{
-		packet->Free();
 		return;
 	}
 	
@@ -37,13 +45,11 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 
 	if (session->type == release)
 	{
-		packet->Free();
 		LeaveCriticalSection(&session->cs);
 		return;
 	}
 	if (session->sessionKey != sessionKey)
 	{
-		packet->Free();
 		LeaveCriticalSection(&session->cs);
 
 		return;
@@ -52,17 +58,22 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 	//헤더 생성 
 
 	//메시지 인큐 
+	packet->refcntUp();
+
 	if (session->sendQ.Enque((BYTE*)&packet, sizeof(packet)) == -1)
 	{
 		//인큐 실패 -> 세션 클로즈 해야함. 
-		packet->Free();
 		LeaveCriticalSection(&session->cs);
 		CancelSession(session);
+		packet->Free();
 		//cancleio
 		return;
 	}
 
-	packet->refcntUp();
+
+
+	packet->sendflag = true;
+
 
 	SendPost(session);
 
@@ -438,6 +449,8 @@ void cNetworkLib::WorkerLoop()
 
 					recvpacketcount++;
 				}
+
+
 				msg->Free();
 				InterlockedAdd(&RecvCount, recvpacketcount);
 
@@ -462,9 +475,9 @@ void cNetworkLib::WorkerLoop()
 						packet->Free();
 					}
 				}
+
 				mysession->sendQ.setsendcount(0);
 				InterlockedAdd(&SendCount, sendcount);
-
 
 				//샌드 링버퍼에 보낼게 있다면보내기 
 				InterlockedExchange((LONG*)&mysession->bSend, 0);
@@ -603,6 +616,8 @@ void cNetworkLib::SendPost(stSession* session)
 					{
 						sendwsabuf[i].buf = (char*)msg->GetHeaderbufferptr();
 						sendwsabuf[i].len = msg->GetHeaderusesize();
+						if (sendwsabuf[i].len == 0)
+							dump.Crash();
 					}
 					else
 					{

@@ -253,36 +253,45 @@ public:
 		AcquireSRWLockExclusive(&_poolsrw);
 
 		Node* node = nullptr;
+		Node* retnod = nullptr;
 		//없으면 더 만들기
 		if (alloc_count == use_count)
 		{
 			node = (Node*)HeapAlloc(hHeap, 0, sizeof(Node));
 			node->frontCHKsum = CHKSUM;
 			node->endCHKsum = CHKSUM;
-			node->Nextnode = freenode;
+
 			new(&node->mydata) Data();
-			freenode = node;
-		//	InterlockedIncrement(&alloc_count);
+
 			alloc_count++;
+
+			retnod = node;
 		}
-
-		Node* retnod = nullptr;
-		//생성자 호출할지 여부 파악후 리턴 
-
-		retnod = freenode;
-		freenode = retnod->Nextnode;
-
-		if (createcall)
+		else if (alloc_count < use_count)
 		{
-			//생성자 호출 
-			new(&retnod->mydata) Data();
+			dump.Crash();
 		}
+		else
+		{	
+			//생성자 호출할지 여부 파악후 리턴 
+			retnod = freenode;
+			freenode = retnod->Nextnode;
 
-	//	InterlockedIncrement(&use_count);
+			if (createcall)
+			{
+				//생성자 호출 
+				new(&retnod->mydata) Data();
+			}
+		}
+		retnod->Nextnode = nullptr;
+
 		use_count++;
 
-		ReleaseSRWLockExclusive(&_poolsrw);
+		if ((retnod->mydata).refcount != 0)
+			dump.Crash();
 
+
+		ReleaseSRWLockExclusive(&_poolsrw);
 		return &retnod->mydata;
 
 	}
@@ -292,10 +301,7 @@ public:
 	{
 		AcquireSRWLockExclusive(&_poolsrw);
 
-
 		Node* inNode = (Node*)((char*)pData - sizeof(unsigned int));
-
-
 		//가득차있다면 false
 		if (use_count == 0)
 		{
@@ -325,11 +331,22 @@ public:
 		else
 		{
 			//소멸자 x
-			Node* savenode = freenode;
-			freenode = inNode;
-			freenode->Nextnode = savenode;
 
+
+			if (inNode == freenode)
+			{
+				dump.Crash();
+			}
+
+			inNode->Nextnode = freenode;
+			freenode = inNode;
 		}
+
+		//if (InterlockedIncrement(&cMassage::debugcount) == 10000)
+		//{
+		//	InterlockedExchange(&cMassage::debugcount, 0);
+		//}
+		//cMassage::debugbuf[cMassage::debugcount] = 'm';
 		//InterlockedDecrement(&use_count);
 		--use_count;
 

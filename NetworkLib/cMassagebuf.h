@@ -14,6 +14,7 @@ public:
 
 	void Free();
 
+	BOOL bAlloc = false;
 
 	//메시지 청소  -  버퍼 비우기 
 	void Clear(void);
@@ -125,8 +126,12 @@ private:
 	static LONG debugcount;
 	static char debugbuf[10000];
 
+	int packetcount=0;
+	char packetdebug[1000] = {0,};
 
+	BOOL sendflag = false;
 
+	int packetsize = 0;
 
 	//사이즈 오류 플래그
 	BOOL bSizenotuse = false;

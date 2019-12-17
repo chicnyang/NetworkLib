@@ -231,7 +231,7 @@ int cRingbuffer::Peek(BYTE* Destbuf, int isize)
 
 
 	if (usesize < isize)
-		return 0;
+		return -1;
 
 
 	if (isize <= dirsize)  //한번에 뺄수 있음. 
@@ -258,7 +258,7 @@ int cRingbuffer::NextPeek(BYTE* Destbuf, int isize, int pCount)
 	int dirsize = DirectDequepeeksize(); //한번에 뺄수 있는 용량 
 
 	if (usesize < isize)
-		return 0;
+		return -1;
 
 
 

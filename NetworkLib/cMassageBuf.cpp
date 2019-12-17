@@ -66,10 +66,16 @@ void cMassage::settingHeader(int byte)
 	headersize = byte;
 	WORD size = bufUsesize;
 
+	if (bufUsesize == 0)
+	{
+		dump.Crash();
+	}
+
+
 	switch (headersize)
 	{
 	case 2:
-		memcpy_s(pHeader+(5- headersize),2, &size, sizeof(size));
+		memcpy_s(pHeader + (5 - headersize), sizeof(WORD), &size, sizeof(WORD));
 		break;
 	case 5:
 		//나중에 세팅할것.
@@ -99,6 +105,12 @@ void cMassage::MemoryPool(int size)
 cMassage * cMassage::Alloc()
 {
 	cMassage* msg = packetPool->alloc();
+	if(msg->refcount != 0)
+	{
+		dump.Crash();
+	}
+	msg->bAlloc = true;
+
 	msg->refcntUp();
 	msg->Clear();
 	return msg;
@@ -106,8 +118,18 @@ cMassage * cMassage::Alloc()
 
 void cMassage::Free()
 {
+	++packetcount;
+	if (packetcount == 1000)
+	{
+		packetcount = 0;
+	}
+	packetdebug[packetcount] = 'f';
+
+
 	if (InterlockedDecrement(&refcount) == 0)
 	{
+		this->bAlloc = false;
+		this->Clear();
 		packetPool->free(this);
 	}
 }
@@ -115,6 +137,8 @@ void cMassage::Free()
 //메시지 청소  -  버퍼 비우기 
 void cMassage::Clear(void)
 {
+	sendflag = false;
+
 	front = 0;
 	rear = 0;
 	bufUsesize = 0;
@@ -153,6 +177,9 @@ int cMassage::MoveWritepos(int pos)
 		return -1;
 	}
 	bufUsesize = rear - front;
+
+	packetsize = bufUsesize;
+
 	return pos;
 }
 
@@ -172,6 +199,12 @@ int cMassage::MoveReadpos(int pos)
 //연산자 오버로딩 넣기 빼기
 cMassage &cMassage::operator = (cMassage &srcMassage)
 {
+	++packetcount;
+	if (packetcount == 1000)
+	{
+		packetcount = 0;
+	}
+	packetdebug[packetcount] = '=';
 
 	cMassage *pMsg = &srcMassage;
 
@@ -183,6 +216,9 @@ cMassage &cMassage::operator = (cMassage &srcMassage)
 	memcpy_s(pBuf+rear, bufsize - bufUsesize,pMsg->Getbufferptr(),pMsg->Getusesize());
 	rear += pMsg->Getusesize();
 	bufUsesize = rear - front;
+
+	packetsize = bufUsesize;
+
 	return *this;
 }
 
@@ -533,12 +569,27 @@ int cMassage::GetsizePacketPool()
 
 void cMassage::refcntUp()
 {
-	InterlockedIncrement(&refcount);
+	++packetcount;
+	if (packetcount == 1000)
+	{
+		packetcount = 0;
+	}
+	packetdebug[packetcount] = 'u';
+
+	if (InterlockedIncrement(&refcount) == 0)
+		dump.Crash();
 }
 
 void cMassage::refcntDown()
 {
-	InterlockedDecrement(&refcount);
+	++packetcount;
+	if (packetcount == 1000)
+	{
+		packetcount = 0;
+	}
+	packetdebug[packetcount] = 'd';
+	if(InterlockedDecrement(&refcount) < 0)
+		dump.Crash();
 }
 
 int cMassage::GetHeaderusesize(void)

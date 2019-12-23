@@ -193,7 +193,6 @@ int cMassage::MoveReadpos(int pos)
 cMassage &cMassage::operator = (cMassage &srcMassage)
 {
 
-
 	cMassage *pMsg = &srcMassage;
 
 	if(bufsize - bufUsesize < pMsg->Getusesize())

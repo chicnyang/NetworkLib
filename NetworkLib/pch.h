@@ -14,6 +14,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <Windows.h>
+#include "LockfreeStack.h"
 #include "DumpFile.h"
 #include <unordered_map>
 #include <process.h>
@@ -26,6 +27,7 @@
 
 #include "NetworkLib.h"
 #include "echoServer.h"
+
 //#include "LogSystem.h"
 
 

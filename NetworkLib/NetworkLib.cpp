@@ -100,22 +100,27 @@ void cNetworkLib::StartNetserver(ServerSetting* serversetting)
 
 	sessionNum = 1;
 
+
+
+
 	poolCount = serversetting->SessionPoolCount;
+	sessionPool = new stSession[poolCount];
 
-	for (int i = 0; i < poolCount; i++)
+
+	for (WORD i = 0; i < poolCount; i++)
 	{
-		stSession* session = new stSession;
-		InitializeCriticalSection(&session->cs);
+		InitializeCriticalSection(&sessionPool[i].cs);
 
-		session->bClose = 0;
-		session->bSend = 0;
-		ZeroMemory(&session->recvoverlap, sizeof(session->recvoverlap));
-		ZeroMemory(&session->sendoverlap, sizeof(session->sendoverlap));
-		session->recvoverlap.mode = recvMode;
-		session->sendoverlap.mode = sendMode;
+		sessionPool[i].bClose = 0;
+		sessionPool[i].bSend = 0;
+		ZeroMemory(&sessionPool[i].recvoverlap, sizeof(sessionPool[i].recvoverlap));
+		ZeroMemory(&sessionPool[i].sendoverlap, sizeof(sessionPool[i].sendoverlap));
+		sessionPool[i].recvoverlap.mode = recvMode;
+		sessionPool[i].sendoverlap.mode = sendMode;
+		sessionPool[i].ArrayIndex = i;
+		sessionPool[i].type = release;
 
-		session->type = release;
-		sessionPool.push_back(session);
+		BlankIndexStack.Push(i);
 	}
 
 	//초기 설정 // IP Port ..
@@ -123,9 +128,6 @@ void cNetworkLib::StartNetserver(ServerSetting* serversetting)
 	serveraddr = serversetting->sockaddr;
 	ThreadMax = serversetting->ThreadMax+1;
 	ThreadRunCount = serversetting->ThreadRun;
-
-	InitializeSRWLock(&map_cs);
-	InitializeCriticalSection(&pool_cs);
 
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
@@ -182,62 +184,39 @@ void cNetworkLib::CloseNetserver()
 
 	WaitForSingleObject(ThreadArray[0],INFINITE);
 
-	AcquireSRWLockExclusive(&map_cs);
-
-	std::unordered_map<__int64, stSession*>::iterator mapiter;
-	std::unordered_map<__int64, stSession*>::iterator mapenditer = sessionMap.end();
-	for (mapiter = sessionMap.begin(); mapiter != mapenditer; ++mapiter)
-	{
-		closesocket((*mapiter).second->socket);
-	}
-
-	ReleaseSRWLockExclusive(&map_cs);
 
 
 	//pool 에 다 들어올때까지 기다리기 
 
 	for(;;)
 	{
-		if (sessionMap.empty() && sessionPool.size() == poolCount)
+		if (BlankIndexStack.stacksize == poolCount)
 		{
 			break;
 		}
 
 	}
 
-
 	//pool 의 요소 하나씩 다 정리하기 
 
-	std::list<stSession*>::iterator iter;
-	std::list<stSession*>::iterator olditer = sessionPool.end();
-
-	for (iter = sessionPool.begin(); iter != olditer;)
+	for (int i = 0; i < poolCount; i++)
 	{
-		DeleteCriticalSection(&(*iter)->cs);
+		DeleteCriticalSection(&sessionPool[i].cs);
 
-		int usesize = (*iter)->sendQ.Getquesize();
+		int usesize = sessionPool[i].sendQ.Getquesize();
 		if (usesize > 0)
 		{
 			for (int i = 0; i < (usesize / 8); i++)
 			{
 				cMassage* msg;
-				(*iter)->sendQ.Deque((BYTE*)&msg,sizeof(msg));
+				sessionPool[i].sendQ.Deque((BYTE*)&msg,sizeof(msg));
 				msg->Free();
 
 			}
 		}
-
-		delete *iter;
-		iter = sessionPool.erase(iter);
 	}
-	sessionMap.clear();
-	sessionPool.clear();
-	std::unordered_map<__int64, stSession*> emptysessionMap;
-	std::list<stSession*> emptysessionPool;
 
-	sessionMap.swap(emptysessionMap);
-	sessionPool.swap(emptysessionPool);
-
+	delete[] sessionPool;
 
 	//스레드 종료 
 	for (int i = 0; i < ThreadMax; i++)
@@ -258,8 +237,6 @@ void cNetworkLib::CloseNetserver()
 
 	//스레드 배열 정리
 	delete[] ThreadArray;
-
-	DeleteCriticalSection(&pool_cs);
 
 
 	WSACleanup();
@@ -310,7 +287,6 @@ void cNetworkLib::AcceptLoop()
 		AcceptCount++;
 		AcceptTotalCount++;
 
-		//1초 지나면 0으로 초기화 
 
 		char ip[20] = { 0 };
 		inet_ntop(AF_INET, &(clientaddr.sin_addr), ip, 20);
@@ -320,6 +296,8 @@ void cNetworkLib::AcceptLoop()
 			closesocket(sock);
 		}*/
 
+
+
 		//세션정보 넣기 
 
 		stSession* session = AllocSession();
@@ -327,11 +305,15 @@ void cNetworkLib::AcceptLoop()
 
 		if (session == NULL)
 		{
-			wprintf_s(L"pool is full %zd \n",sessionMap.size());
+			wprintf_s(L"pool is full \n");
 			return;
 		}
 
-		session->sessionKey = sessionNum;
+		session->sessionKey = sessionNum<<16;
+		__int64* key = &session->sessionKey;
+		*((WORD*)key) = session->ArrayIndex;
+
+
 		session->socket = sock;
 		session->closesock = sock;
 		session->IOcount = 0;
@@ -686,19 +668,17 @@ cNetworkLib::stSession* cNetworkLib::AllocSession()
 	stSession* session = NULL;
 
 	//pool 에 대한 동기화 
-	EnterCriticalSection(&pool_cs);
 
-	if(!sessionPool.empty())
+
+	if(BlankIndexStack.stacksize > 0)
 	{
-		session = *(sessionPool.begin());
-		sessionPool.pop_front();
+		WORD index = BlankIndexStack.Pop();
+		session = &sessionPool[index];
 	}
 	else
 	{
 		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"pool is full ");
 	}
-	LeaveCriticalSection(&pool_cs);
-
 	return session;
 }
 
@@ -706,21 +686,14 @@ void cNetworkLib::ReleaseSession(stSession * session)
 {
 
 	//pool 에 대한 동기화 
-	EnterCriticalSection(&pool_cs);
-
-	sessionPool.push_back(session);
-
-	LeaveCriticalSection(&pool_cs);
+	BlankIndexStack.Push(session->ArrayIndex);
 
 }
 
 void cNetworkLib::InputSession(stSession * session)
 {
-	AcquireSRWLockExclusive(&map_cs);
 
-	sessionMap.insert(std::make_pair(session->sessionKey, session));
 	InterlockedIncrement(&ConnectSessioncount);
-	ReleaseSRWLockExclusive(&map_cs);
 }
 
 void cNetworkLib::DeleteSession(stSession * session)
@@ -731,10 +704,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"deletesession id -  %d ", session->sessionKey);
 	}
 
-	AcquireSRWLockExclusive(&map_cs);
-	sessionMap.erase(session->sessionKey);
 	InterlockedDecrement(&ConnectSessioncount);
-	ReleaseSRWLockExclusive(&map_cs);
 	
 	EnterCriticalSection(&session->cs);
 
@@ -778,17 +748,11 @@ cNetworkLib::stSession* cNetworkLib::FindSession(__int64 sessionKey)
 
 	stSession* session = NULL;
 
-	std::unordered_map<__int64, stSession*>::iterator iter;
-
-	AcquireSRWLockShared(&map_cs);
-
-	iter = sessionMap.find(sessionKey);
-	
-	if (iter != sessionMap.end())
-		session = (*iter).second;
-
-	ReleaseSRWLockShared(&map_cs);
-
+	WORD index = (WORD)sessionKey;
+	if (sessionPool[index].type == alloc)
+	{
+		session = &sessionPool[index];
+	}
 	return session;
 }
 

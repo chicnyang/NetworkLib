@@ -98,6 +98,8 @@ protected:
 
 		DWORD startsend = 0;
 
+		WORD ArrayIndex;
+
 	};
 
 	virtual void onRecv(__int64 sessionKey, cMassage* msg) PURE;
@@ -131,17 +133,20 @@ private:
 	BOOL RecvPost(stSession* session);
 
 	//session pool
-	CRITICAL_SECTION pool_cs;
-	std::list<stSession*> sessionPool;
-	
+	//CRITICAL_SECTION pool_cs;
+	//std::list<stSession*> sessionPool;
+	stSession* sessionPool;
+	LockfreeStack <WORD>BlankIndexStack;
+
+
 	DWORD poolCount;
 
 	stSession* AllocSession();
 	void ReleaseSession(stSession* session);
 
 	//session map
-	SRWLOCK map_cs;
-	std::unordered_map<__int64, stSession*> sessionMap;
+	//SRWLOCK map_cs;
+	//std::unordered_map<__int64, stSession*> sessionMap;
 
 
 	void InputSession(stSession* session);

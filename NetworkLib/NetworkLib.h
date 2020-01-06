@@ -84,21 +84,26 @@ protected:
 		Myoverlapped sendoverlap;
 		Myoverlapped recvoverlap;
 
-		cRingbuffer sendQ;
-		cRingbuffer recvQ;
+		LockfreeQue<cMassage*>* sendQ; //sendQ
+		cRingbuffer recvQ;	//recvQ
 
-		CRITICAL_SECTION cs;
 
-		DWORD IOcount;
+		LockfreeQue<cMassage*>* sendBufstack; //send 한 직렬화버퍼 담는 스택 
+		LONG sendCount;		//Send 직렬화버퍼 카운트 
 
-		LONG bSend;
-		LONG bClose;
+		LONG bSend;			//샌드 플래그 
+		LONG bClose;		//종료 플래그 
 
-		DWORD type;
+		LONG bRelease;		//릴리즈 플래그 
+		LONG IOcount;		//참조 카운트 
 
-		DWORD startsend = 0;
 
-		WORD ArrayIndex;
+		DWORD type;			//사용 플래그
+
+		DWORD startsend = 0; 
+
+		WORD ArrayIndex;	//인덱스 번호 
+
 
 	};
 
@@ -109,50 +114,59 @@ protected:
 
 private:
 
-	//unordered_map<UINT64, SESSION*>         _MapSession;
-	//typedef unordered_map<UINT64, SESSION*>   MAPSESSION;
+	struct stRelease
+	{
+		LONG bRelease;	
+		LONG IOcount;
+	};
 
+
+
+	//=========== IOCP 핸들
 	HANDLE hIocp;
 
+	//=========== 스레드 핸들 배열
 	HANDLE* ThreadArray;
 
+	//=========== 서버 ADDR
 	SOCKADDR_IN serveraddr;
+
+	//=========== listen 소켓
 	SOCKET listen_socket;
+
+	//=========== 세션 넘버 +1
 	__int64 sessionNum;
 
-	static unsigned int WINAPI workerTh(LPVOID thisclass);
-	static unsigned int WINAPI acceptTh(LPVOID thisclass);
-
-	void AcceptLoop();
-	void WorkerLoop();
-
+	//=========== 스레드 정보 
 	int ThreadMax;
 	int ThreadRunCount;
 
+	//===========  Worker TH + Accept TH
+	static unsigned int WINAPI workerTh(LPVOID thisclass);
+	static unsigned int WINAPI acceptTh(LPVOID thisclass);
+
+	//=========== Worker loof + Accept loof
+	void AcceptLoop();
+	void WorkerLoop();
+
+	//=========== 송수신 함수 
 	void SendPost(stSession* session);
 	BOOL RecvPost(stSession* session);
 
-	//session pool
-	//CRITICAL_SECTION pool_cs;
-	//std::list<stSession*> sessionPool;
+
+	//===================세션 배열 +  빈 인덱스 스택===========================//
 	stSession* sessionPool;
 	LockfreeStack <WORD>BlankIndexStack;
-
-
 	DWORD poolCount;
 
-	stSession* AllocSession();
+
+
+	//=========== 세션 사용 함수  
+	stSession* AllocSession(); 
 	void ReleaseSession(stSession* session);
-
-	//session map
-	//SRWLOCK map_cs;
-	//std::unordered_map<__int64, stSession*> sessionMap;
-
-
 	void InputSession(stSession* session);
 	void DeleteSession(stSession * session);
 	stSession* FindSession(__int64 sessionKey);
-
 	void CancelSession(stSession* session);
 
 

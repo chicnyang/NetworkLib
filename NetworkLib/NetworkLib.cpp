@@ -17,102 +17,21 @@ cNetworkLib::~cNetworkLib()
 
 }
 
-void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
-{
-
-	if (packet->refcount != 1)
-	{
-		dump.Crash();
-	}
-
-
-	packet->settingHeader(2);
-
-
-
-
-
-	stSession* session = FindSession(sessionKey);
-	if (session == NULL)
-	{
-		return;
-	}
-	
-
-
-	EnterCriticalSection(&session->cs);
-
-
-	if (session->type == release)
-	{
-		LeaveCriticalSection(&session->cs);
-		return;
-	}
-	if (session->sessionKey != sessionKey)
-	{
-		LeaveCriticalSection(&session->cs);
-
-		return;
-	}
-
-	//헤더 생성 
-
-	//메시지 인큐 
-	packet->refcntUp();
-
-	if (session->sendQ.Enque((BYTE*)&packet, sizeof(packet)) == -1)
-	{
-		//인큐 실패 -> 세션 클로즈 해야함. 
-		LeaveCriticalSection(&session->cs);
-		CancelSession(session);
-		packet->Free();
-		//cancleio
-		return;
-	}
-
-
-
-	packet->sendflag = true;
-
-
-	SendPost(session);
-
-	LeaveCriticalSection(&session->cs);
-}
-
-void cNetworkLib::Disconnect(__int64 sessionKey)
-{
-	//일단 bclose 변수 확인후 false 면 closesocket 
-
-	stSession* session = FindSession(sessionKey);
-
-	if (session == NULL)
-	{
-		dump.Crash();
-		return;
-	}
-	CancelSession(session);
-
-}
-
 void cNetworkLib::StartNetserver(ServerSetting* serversetting)
 {
 
 	sessionNum = 1;
 
-
-
-
 	poolCount = serversetting->SessionPoolCount;
 	sessionPool = new stSession[poolCount];
 
-
 	for (WORD i = 0; i < poolCount; i++)
 	{
-		InitializeCriticalSection(&sessionPool[i].cs);
-
+		sessionPool[i].sendBufstack = new LockfreeQue<cMassage*>;
+		sessionPool[i].sendQ = new LockfreeQue<cMassage*>;
 		sessionPool[i].bClose = 0;
 		sessionPool[i].bSend = 0;
+		sessionPool[i].bRelease = 0;
 		ZeroMemory(&sessionPool[i].recvoverlap, sizeof(sessionPool[i].recvoverlap));
 		ZeroMemory(&sessionPool[i].sendoverlap, sizeof(sessionPool[i].sendoverlap));
 		sessionPool[i].recvoverlap.mode = recvMode;
@@ -184,8 +103,6 @@ void cNetworkLib::CloseNetserver()
 
 	WaitForSingleObject(ThreadArray[0],INFINITE);
 
-
-
 	//pool 에 다 들어올때까지 기다리기 
 
 	for(;;)
@@ -201,15 +118,13 @@ void cNetworkLib::CloseNetserver()
 
 	for (int i = 0; i < poolCount; i++)
 	{
-		DeleteCriticalSection(&sessionPool[i].cs);
-
-		int usesize = sessionPool[i].sendQ.Getquesize();
+		int usesize = sessionPool[i].sendQ->quesize;
 		if (usesize > 0)
 		{
 			for (int i = 0; i < (usesize / 8); i++)
 			{
 				cMassage* msg;
-				sessionPool[i].sendQ.Deque((BYTE*)&msg,sizeof(msg));
+				msg = sessionPool[i].sendQ->Deque();
 				msg->Free();
 
 			}
@@ -296,12 +211,9 @@ void cNetworkLib::AcceptLoop()
 			closesocket(sock);
 		}*/
 
-
-
 		//세션정보 넣기 
 
 		stSession* session = AllocSession();
-
 
 		if (session == NULL)
 		{
@@ -319,6 +231,8 @@ void cNetworkLib::AcceptLoop()
 		session->IOcount = 0;
 
 		session->type = alloc;
+		session->bRelease = 0;
+
 
 		// 맵에 넣기 
 		InputSession(session);  
@@ -441,29 +355,36 @@ void cNetworkLib::WorkerLoop()
 			}
 			else  //send 일때 
 			{
-				//mysession->sendQ.Movefront(transbyte);
-				int sendcount = mysession->sendQ.getsendcount();
+				//직렬화버퍼 스택에서 하나씩 빼서 delete
+
+				int sendcount = mysession->sendCount;
 				for (int i = 0; i < sendcount; i++)
 				{
-					cMassage* packet;
-					if (mysession->sendQ.Deque((BYTE*)&packet, sizeof(packet)) == -1)
+					cMassage* packet = NULL;
+
+					InterlockedDecrement(&mysession->sendCount);
+					packet = mysession->sendBufstack->Deque();
+
+
+
+					if (packet == NULL)
 					{
 						CancelSession(mysession);
-						LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - send trans  %d", transbyte);
+						LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - send trans  %d , count %d", transbyte,sendcount);
 						break;
 					}
 					else
 					{
+
 						packet->Free();
 					}
 				}
 
-				mysession->sendQ.setsendcount(0);
 				InterlockedAdd(&SendCount, sendcount);
 
 				//샌드 링버퍼에 보낼게 있다면보내기 
 				InterlockedExchange((LONG*)&mysession->bSend, 0);
-				int usesize = mysession->sendQ.Getquesize();
+				int usesize = mysession->sendQ->quesize;
 
 				if (usesize > 0)
 				{
@@ -478,12 +399,93 @@ void cNetworkLib::WorkerLoop()
 
 		} while (0);
 
-		if (0 == InterlockedDecrement((LONG*)&mysession->IOcount))   //완료통지에 대한 차감 
+		if (0 == InterlockedDecrement(&mysession->IOcount))   //완료통지에 대한 차감 
 		{
 			DeleteSession(mysession);
 		}
 	}
 }
+
+void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
+{
+
+	if (packet->refcount != 1)
+	{
+		dump.Crash();
+	}
+
+	packet->settingHeader(2);
+
+	stSession* session = FindSession(sessionKey);
+	if (session == NULL)
+	{
+		return;
+	}
+
+	//세션 iocount 증가
+	if (InterlockedIncrement(&session->IOcount) == 1)
+	{
+		if (0 == InterlockedDecrement(&session->IOcount))
+		{
+			DeleteSession(session);
+		}
+		return;
+	}
+
+	// iocount 가 1이아닌데 release 탄경우 예방
+	if (session->bRelease)
+	{
+		if (0 == InterlockedDecrement(&session->IOcount))
+		{
+			DeleteSession(session);
+		}
+		return;
+	}
+
+	//세션 id 끼리 확인 
+	if (session->sessionKey != sessionKey)
+	{
+		if (0 == InterlockedDecrement(&session->IOcount))
+		{
+			DeleteSession(session);
+		}
+		return;
+	}
+
+	//헤더 생성 
+
+	//메시지 인큐 
+	packet->refcntUp();
+
+	session->sendQ->Enque(packet);
+
+	packet->sendflag = true;
+
+	SendPost(session);
+
+
+	if (0 == InterlockedDecrement(&session->IOcount))
+	{
+		DeleteSession(session);
+	}
+	return;
+}
+
+void cNetworkLib::Disconnect(__int64 sessionKey)
+{
+	//일단 bclose 변수 확인후 false 면 closesocket 
+
+	stSession* session = FindSession(sessionKey);
+
+	if (session == NULL)
+	{
+		dump.Crash();
+		return;
+	}
+	CancelSession(session);
+
+}
+
 
 BOOL cNetworkLib::RecvPost(stSession* session)
 {
@@ -556,13 +558,13 @@ void cNetworkLib::SendPost(stSession* session)
 	{
 		if (InterlockedExchange((LONG*)&session->bSend, 1) == 0)
 		{
-			usesize = session->sendQ.Getquesize();
+			usesize = session->sendQ->quesize;
 
 			if (usesize == 0)
 			{
 				InterlockedExchange((LONG*)&session->bSend, 0);
 
-				usesize = session->sendQ.Getquesize();
+				usesize = session->sendQ->quesize;
 				if (usesize > 0)
 				{
 					continue;
@@ -581,47 +583,44 @@ void cNetworkLib::SendPost(stSession* session)
 				//wsabuf  에 받을 링버퍼 포인터 넣기 
 				//링버퍼 경계 걸치는 지 확인후 추가로 버퍼포인터 넣을지 결정 
 
-				int dirdequesize = session->sendQ.DirectDequesize();
+				usesize = session->sendQ->quesize;
 
-				if (dirdequesize == 0 || usesize == 0)
+				if (usesize == 0)
 				{
-					LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"recvpost size 0 free -  %d , dir %d ", usesize, dirdequesize);
+					LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"recvpost size 0 free -  %d , dir %d ", usesize);
 				}
 
-
-				int sendbufcount = usesize / 8;
-
-				for (int i = 0; i < sendbufcount; i++)
+				for (int i = 0; i < usesize; i++)
 				{
 					cMassage* msg;
-					if (-1 != session->sendQ.NextPeek((BYTE*)&msg, 8, sendbufcount))
+
+					msg = session->sendQ->Deque();
+
+					if(msg != NULL)
 					{
 						sendwsabuf[i].buf = (char*)msg->GetHeaderbufferptr();
 						sendwsabuf[i].len = msg->GetHeaderusesize();
 						if (sendwsabuf[i].len == 0)
 							dump.Crash();
-					}
-					else
-					{
-						sendbufcount = i;
+
+
+						session->sendBufstack->Enque(msg);
+						InterlockedIncrement(&session->sendCount);
 					}
 				}
-				session->sendQ.setsendcount(sendbufcount);
-
-
 
 				ZeroMemory(&session->sendoverlap.overlap, sizeof(session->sendoverlap.overlap));
 				DWORD sendretbyte = 0;
-				session->sendoverlap.sendcount = sendbufcount;
+				session->sendoverlap.sendcount = usesize;
 
-				if (InterlockedIncrement((LONG*)&session->IOcount) == 1)
-				{
-					InterlockedDecrement((LONG*)&session->IOcount);
-					break;
-				}
-
+				//if (InterlockedIncrement((LONG*)&session->IOcount) == 1)
+				//{
+				//	InterlockedDecrement((LONG*)&session->IOcount);
+				//	break;
+				//}
+				InterlockedIncrement((LONG*)&session->IOcount);
 				session->startsend = timeGetTime();
-				int retsend = WSASend(session->socket, sendwsabuf, sendbufcount, &sendretbyte, 0, (OVERLAPPED*)&session->sendoverlap, NULL);
+				int retsend = WSASend(session->socket, sendwsabuf, usesize, &sendretbyte, 0, (OVERLAPPED*)&session->sendoverlap, NULL);
 				DWORD endtime = timeGetTime();
 				if ((endtime - session->startsend) < 2)
 				{
@@ -657,7 +656,9 @@ void cNetworkLib::SendPost(stSession* session)
 		}
 
 
-	} while (0);
+		break;
+
+	} while (1);
 
 	
 	return;
@@ -706,38 +707,36 @@ void cNetworkLib::DeleteSession(stSession * session)
 
 	InterlockedDecrement(&ConnectSessioncount);
 	
-	EnterCriticalSection(&session->cs);
+	//release 플래그와  iocount 한번에 확인하기 
 
-	if (session->type == release)
+	stRelease srcrelease;
+	srcrelease.bRelease = 0;
+	srcrelease.IOcount = 0;
+
+	stRelease Exrelease;
+	Exrelease.bRelease = 1;
+	Exrelease.IOcount = 0;
+
+	if (InterlockedCompareExchange64((volatile LONG64*)&session->bRelease, (LONG64)Exrelease.bRelease, (LONG64)srcrelease.bRelease) != (LONG64)srcrelease.bRelease)
 	{
-		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"deletesession - release id -  %d ", session->sessionKey);
-		LeaveCriticalSection(&session->cs);
-
 		return;
 	}
 
-	int sendcount = session->sendQ.Getquesize()/8;
+	int sendcount = session->sendQ->quesize;
 	for (int i = 0; i < sendcount; i++)
 	{
 		cMassage* packet;
-		session->sendQ.Deque((BYTE*)&packet, sizeof(packet));
-		packet->Free();
+		packet = session->sendQ->Deque();
+		if(packet != NULL)
+			packet->Free();
 	}
-
 
 	session->socket = INVALID_SOCKET;
 	closesocket(session->closesock);
-
 	session->sessionKey = 0;
 	session->bSend = 0;
-
-	session->sendQ.Clearbuf();
 	session->recvQ.Clearbuf();
-
 	session->type = release;
-
-	LeaveCriticalSection(&session->cs);
-
 
 	ReleaseSession(session);
 
@@ -758,13 +757,9 @@ cNetworkLib::stSession* cNetworkLib::FindSession(__int64 sessionKey)
 
 void cNetworkLib::CancelSession(stSession * session)
 {
-	EnterCriticalSection(&session->cs);
-
 	if (InterlockedExchange((LONG*)&session->bClose, 1) == 0)
 	{
 		session->socket = INVALID_SOCKET;
 		CancelIo((HANDLE)session->closesock);
 	}
-
-	LeaveCriticalSection(&session->cs);
 }

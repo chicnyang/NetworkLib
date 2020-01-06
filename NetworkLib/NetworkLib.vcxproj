@@ -160,10 +160,11 @@
     <ClInclude Include="cMassagebuf.h" />
     <ClInclude Include="DumpFile.h" />
     <ClInclude Include="echoServer.h" />
+    <ClInclude Include="LockfreeQue.h" />
     <ClInclude Include="LockfreeStack.h" />
     <ClInclude Include="logfile.h" />
+    <ClInclude Include="MemoryPool_stack.h" />
     <ClInclude Include="NetworkLib.h" />
-    <ClInclude Include="Objectlistpool.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="RingbufferQue.h" />
   </ItemGroup>

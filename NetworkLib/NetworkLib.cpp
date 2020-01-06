@@ -222,6 +222,27 @@ void cNetworkLib::AcceptLoop()
 			return;
 		}
 
+		//세션 iocount 증가
+		InterlockedIncrement64(&session->refCnt.IOcount);
+
+		//for (;;)
+		//{
+		//	stRelease srcrelease;
+		//	srcrelease.bRelease = 1;
+		//	srcrelease.IOcount = 0;
+
+		//	stRelease Exrelease;
+		//	Exrelease.bRelease = 0;
+		//	Exrelease.IOcount = 1;
+
+		//	if (InterlockedCompareExchange128((volatile LONG64*)&(session->refCnt), (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
+		//	{
+		//		break;
+		//	}
+
+		//}
+
+
 		session->sessionKey = sessionNum<<16;
 		__int64* key = &session->sessionKey;
 		*((WORD*)key) = session->ArrayIndex;
@@ -235,23 +256,7 @@ void cNetworkLib::AcceptLoop()
 		// 맵에 넣기 
 		InputSession(session);  
 
-
-		for(;;)
-		{
-			stRelease srcrelease;
-			srcrelease.bRelease = 1;
-			srcrelease.IOcount = 0;
-
-			stRelease Exrelease;
-			Exrelease.bRelease = 0;
-			Exrelease.IOcount = 1;
-
-			if (InterlockedCompareExchange128((volatile LONG64*)&(session->refCnt), (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
-			{
-				break;
-			}
-
-		}
+		session->refCnt.bRelease = 0;
 
 
 
@@ -738,7 +743,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 	Exrelease.bRelease = 1;
 	Exrelease.IOcount = 0;
 
-	if (InterlockedCompareExchange128((volatile LONG64*)&session->refCnt, (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
+	if (!InterlockedCompareExchange128((volatile LONG64*)&session->refCnt, (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
 	{
 		return;
 	}

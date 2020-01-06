@@ -228,14 +228,16 @@ void cNetworkLib::AcceptLoop()
 
 		session->socket = sock;
 		session->closesock = sock;
-		session->IOcount = 0;
 
 		session->type = alloc;
-		session->bRelease = 0;
-
 
 		// 맵에 넣기 
 		InputSession(session);  
+
+		InterlockedIncrement(&session->IOcount);
+
+		InterlockedExchange(&session->bRelease,0);
+
 
 		//소켓과 IOCP 연결 
 		CreateIoCompletionPort((HANDLE)session->socket, hIocp, (ULONG_PTR)session, 0);
@@ -245,7 +247,10 @@ void cNetworkLib::AcceptLoop()
 			onClientJoin(session->sessionKey);
 		}
 
-
+		if (InterlockedDecrement(&session->IOcount) == 0)
+		{
+			DeleteSession(session);
+		}
 
 		sessionNum++;
 
@@ -279,6 +284,8 @@ void cNetworkLib::WorkerLoop()
 			if (overlap == NULL)
 			{
 				//iocp 문제 
+				if (overlap->mode == sendMode)
+					dump.Crash();
 				return;
 			}
 
@@ -613,20 +620,15 @@ void cNetworkLib::SendPost(stSession* session)
 				DWORD sendretbyte = 0;
 				session->sendoverlap.sendcount = usesize;
 
-				//if (InterlockedIncrement((LONG*)&session->IOcount) == 1)
-				//{
-				//	InterlockedDecrement((LONG*)&session->IOcount);
-				//	break;
-				//}
 				InterlockedIncrement((LONG*)&session->IOcount);
 				session->startsend = timeGetTime();
 				int retsend = WSASend(session->socket, sendwsabuf, usesize, &sendretbyte, 0, (OVERLAPPED*)&session->sendoverlap, NULL);
-				DWORD endtime = timeGetTime();
-				if ((endtime - session->startsend) < 2)
-				{
-					sendPlustime += (endtime - session->startsend);
-					InterlockedIncrement(&sendpluscounttime);
-				}
+				//DWORD endtime = timeGetTime();
+				//if ((endtime - session->startsend) < 2)
+				//{
+				//	sendPlustime += (endtime - session->startsend);
+				//	InterlockedIncrement(&sendpluscounttime);
+				//}
 
 				
 				if (retsend == SOCKET_ERROR)
@@ -728,6 +730,15 @@ void cNetworkLib::DeleteSession(stSession * session)
 		cMassage* packet;
 		packet = session->sendQ->Deque();
 		if(packet != NULL)
+			packet->Free();
+	}
+
+	int bufcount = session->sendBufstack->quesize;
+	for (int i = 0; i < bufcount; i++)
+	{
+		cMassage* packet;
+		packet = session->sendBufstack->Deque();
+		if (packet != NULL)
 			packet->Free();
 	}
 

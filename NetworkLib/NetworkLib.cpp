@@ -31,7 +31,8 @@ void cNetworkLib::StartNetserver(ServerSetting* serversetting)
 		sessionPool[i].sendQ = new LockfreeQue<cMassage*>;
 		sessionPool[i].bClose = 0;
 		sessionPool[i].bSend = 0;
-		sessionPool[i].bRelease = 0;
+		sessionPool[i].refCnt.bRelease = 1;
+		sessionPool[i].refCnt.IOcount = 0;
 		ZeroMemory(&sessionPool[i].recvoverlap, sizeof(sessionPool[i].recvoverlap));
 		ZeroMemory(&sessionPool[i].sendoverlap, sizeof(sessionPool[i].sendoverlap));
 		sessionPool[i].recvoverlap.mode = recvMode;
@@ -234,9 +235,25 @@ void cNetworkLib::AcceptLoop()
 		// 맵에 넣기 
 		InputSession(session);  
 
-		InterlockedIncrement(&session->IOcount);
 
-		InterlockedExchange(&session->bRelease,0);
+		for(;;)
+		{
+			stRelease srcrelease;
+			srcrelease.bRelease = 1;
+			srcrelease.IOcount = 0;
+
+			stRelease Exrelease;
+			Exrelease.bRelease = 0;
+			Exrelease.IOcount = 1;
+
+			if (InterlockedCompareExchange128((volatile LONG64*)&session->refCnt, (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
+			{
+				break;
+			}
+
+		}
+
+
 
 
 		//소켓과 IOCP 연결 
@@ -247,7 +264,7 @@ void cNetworkLib::AcceptLoop()
 			onClientJoin(session->sessionKey);
 		}
 
-		if (InterlockedDecrement(&session->IOcount) == 0)
+		if (InterlockedDecrement64(&session->refCnt.IOcount) == 0)
 		{
 			DeleteSession(session);
 		}
@@ -363,29 +380,28 @@ void cNetworkLib::WorkerLoop()
 			else  //send 일때 
 			{
 				//직렬화버퍼 스택에서 하나씩 빼서 delete
+				//send 완료 통지에서 나만 건드림
 
 				int sendcount = mysession->sendCount;
+
 				for (int i = 0; i < sendcount; i++)
 				{
 					cMassage* packet = NULL;
-
-					InterlockedDecrement(&mysession->sendCount);
 					packet = mysession->sendBufstack->Deque();
-
-
 
 					if (packet == NULL)
 					{
 						CancelSession(mysession);
-						LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - send trans  %d , count %d", transbyte,sendcount);
+						LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - send trans  %d , count %d", transbyte, sendcount);
 						break;
 					}
 					else
 					{
-
 						packet->Free();
+						InterlockedDecrement(&mysession->sendCount);
 					}
 				}
+
 
 				InterlockedAdd(&SendCount, sendcount);
 
@@ -406,7 +422,7 @@ void cNetworkLib::WorkerLoop()
 
 		} while (0);
 
-		if (0 == InterlockedDecrement(&mysession->IOcount))   //완료통지에 대한 차감 
+		if (0 == InterlockedDecrement64(&mysession->refCnt.IOcount))   //완료통지에 대한 차감 
 		{
 			DeleteSession(mysession);
 		}
@@ -430,9 +446,9 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 	}
 
 	//세션 iocount 증가
-	if (InterlockedIncrement(&session->IOcount) == 1)
+	if (InterlockedIncrement64(&session->refCnt.IOcount) == 1)
 	{
-		if (0 == InterlockedDecrement(&session->IOcount))
+		if (0 == InterlockedDecrement64(&session->refCnt.IOcount))
 		{
 			DeleteSession(session);
 		}
@@ -440,9 +456,9 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 	}
 
 	// iocount 가 1이아닌데 release 탄경우 예방
-	if (session->bRelease)
+	if (session->refCnt.bRelease)
 	{
-		if (0 == InterlockedDecrement(&session->IOcount))
+		if (0 == InterlockedDecrement64(&session->refCnt.IOcount))
 		{
 			DeleteSession(session);
 		}
@@ -452,7 +468,7 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 	//세션 id 끼리 확인 
 	if (session->sessionKey != sessionKey)
 	{
-		if (0 == InterlockedDecrement(&session->IOcount))
+		if (0 == InterlockedDecrement64(&session->refCnt.IOcount))
 		{
 			DeleteSession(session);
 		}
@@ -471,7 +487,7 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 	SendPost(session);
 
 
-	if (0 == InterlockedDecrement(&session->IOcount))
+	if (0 == InterlockedDecrement64(&session->refCnt.IOcount))
 	{
 		DeleteSession(session);
 	}
@@ -532,7 +548,7 @@ BOOL cNetworkLib::RecvPost(stSession* session)
 	DWORD retbyte = 0;
 
 
-	InterlockedIncrement((LONG*)&session->IOcount);
+	InterlockedIncrement64(&session->refCnt.IOcount);
 	int retrecv = WSARecv(session->socket, recvwsabuf, recvbufcount, &retbyte, &flag, (OVERLAPPED*)&session->recvoverlap, NULL);
 	if (retrecv == SOCKET_ERROR)
 	{
@@ -540,7 +556,7 @@ BOOL cNetworkLib::RecvPost(stSession* session)
 		if (err != ERROR_IO_PENDING)
 		{
 			//오류 
-			if (0 == InterlockedDecrement((LONG*)&session->IOcount))
+			if (0 == InterlockedDecrement64(&session->refCnt.IOcount))
 			{
 				DeleteSession(session);
 				return false;
@@ -561,7 +577,9 @@ void cNetworkLib::SendPost(stSession* session)
 
 	int usesize;
 
-	do
+
+
+	for (;;)
 	{
 		if (InterlockedExchange((LONG*)&session->bSend, 1) == 0)
 		{
@@ -603,7 +621,7 @@ void cNetworkLib::SendPost(stSession* session)
 
 					msg = session->sendQ->Deque();
 
-					if(msg != NULL)
+					if (msg != NULL)
 					{
 						sendwsabuf[i].buf = (char*)msg->GetHeaderbufferptr();
 						sendwsabuf[i].len = msg->GetHeaderusesize();
@@ -620,8 +638,8 @@ void cNetworkLib::SendPost(stSession* session)
 				DWORD sendretbyte = 0;
 				session->sendoverlap.sendcount = usesize;
 
-				InterlockedIncrement((LONG*)&session->IOcount);
-				session->startsend = timeGetTime();
+				InterlockedIncrement64(&session->refCnt.IOcount);
+				//session->startsend = timeGetTime();
 				int retsend = WSASend(session->socket, sendwsabuf, usesize, &sendretbyte, 0, (OVERLAPPED*)&session->sendoverlap, NULL);
 				//DWORD endtime = timeGetTime();
 				//if ((endtime - session->startsend) < 2)
@@ -630,18 +648,18 @@ void cNetworkLib::SendPost(stSession* session)
 				//	InterlockedIncrement(&sendpluscounttime);
 				//}
 
-				
+
 				if (retsend == SOCKET_ERROR)
 				{
 					if (WSAGetLastError() != WSA_IO_PENDING)
 					{
 						//오류 
-						if (0 == InterlockedDecrement((LONG*)&session->IOcount))
+						if (0 == InterlockedDecrement64(&session->refCnt.IOcount))
 						{
 							DeleteSession(session);
 						}
 
-						InterlockedExchange((LONG*)&session->bSend, 0);
+						InterlockedExchange(&session->bSend, 0);
 						break;
 					}
 
@@ -650,7 +668,7 @@ void cNetworkLib::SendPost(stSession* session)
 
 			}
 
-		
+
 		}
 		else
 		{
@@ -659,10 +677,9 @@ void cNetworkLib::SendPost(stSession* session)
 
 
 		break;
+	}
 
-	} while (1);
 
-	
 	return;
 }
 
@@ -677,6 +694,8 @@ cNetworkLib::stSession* cNetworkLib::AllocSession()
 	{
 		WORD index = BlankIndexStack.Pop();
 		session = &sessionPool[index];
+		if (session != NULL)
+			session->refCnt.bRelease = 1;
 	}
 	else
 	{
@@ -719,7 +738,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 	Exrelease.bRelease = 1;
 	Exrelease.IOcount = 0;
 
-	if (InterlockedCompareExchange64((volatile LONG64*)&session->bRelease, (LONG64)Exrelease.bRelease, (LONG64)srcrelease.bRelease) != (LONG64)srcrelease.bRelease)
+	if (InterlockedCompareExchange128((volatile LONG64*)&session->refCnt, (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
 	{
 		return;
 	}
@@ -744,7 +763,6 @@ void cNetworkLib::DeleteSession(stSession * session)
 
 	session->socket = INVALID_SOCKET;
 	closesocket(session->closesock);
-	session->sessionKey = 0;
 	session->bSend = 0;
 	session->recvQ.Clearbuf();
 	session->type = release;

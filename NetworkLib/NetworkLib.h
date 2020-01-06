@@ -72,6 +72,12 @@ protected:
 		int sendcount;
 	};
 
+
+	struct stRelease
+	{
+		LONG64 bRelease;
+		LONG64 IOcount;
+	};
 	//session
 	struct stSession
 	{
@@ -94,8 +100,10 @@ protected:
 		LONG bSend;			//샌드 플래그 
 		LONG bClose;		//종료 플래그 
 
-		LONG bRelease;		//릴리즈 플래그 
-		LONG IOcount;		//참조 카운트 
+
+		stRelease refCnt;
+		//LONG bRelease;		//릴리즈 플래그 
+		//LONG IOcount;		//참조 카운트 
 
 
 		DWORD type;			//사용 플래그
@@ -113,13 +121,6 @@ protected:
 	//virtual bool OnConnectionRequest(const char* clientIP,int Port) PURE;
 
 private:
-
-	struct stRelease
-	{
-		LONG bRelease;	
-		LONG IOcount;
-	};
-
 
 
 	//=========== IOCP 핸들

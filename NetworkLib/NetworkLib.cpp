@@ -246,7 +246,7 @@ void cNetworkLib::AcceptLoop()
 			Exrelease.bRelease = 0;
 			Exrelease.IOcount = 1;
 
-			if (InterlockedCompareExchange128((volatile LONG64*)&session->refCnt, (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
+			if (InterlockedCompareExchange128((volatile LONG64*)&(session->refCnt), (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
 			{
 				break;
 			}

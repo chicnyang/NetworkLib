@@ -301,7 +301,17 @@ public:
 	{
 		AcquireSRWLockExclusive(&_poolsrw);
 
+
+
+
 		Node* inNode = (Node*)((char*)pData - sizeof(unsigned int));
+
+
+		if ((inNode->mydata).refcount != 0)
+			dump.Crash();
+
+
+
 		//가득차있다면 false
 		if (use_count == 0)
 		{

@@ -67,6 +67,8 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 	//메시지 인큐 
 	packet->refcntUp();
 
+	session->sendQ.Lock();
+
 	if (session->sendQ.Enque((BYTE*)&packet, sizeof(packet)) == -1)
 	{
 		//인큐 실패 -> 세션 클로즈 해야함. 
@@ -79,7 +81,7 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 		return;
 	}
 
-
+	session->sendQ.Unlock();
 
 	packet->sendflag = true;
 
@@ -324,7 +326,7 @@ void cNetworkLib::AcceptLoop()
 
 
 		InterlockedIncrement(&session->IOcount);
-
+		session->bRelease = 0;
 
 		session->sessionKey = sessionNum<<16;
 		__int64* key = &session->sessionKey;
@@ -333,7 +335,6 @@ void cNetworkLib::AcceptLoop()
 
 		session->socket = sock;
 		session->closesock = sock;
-		session->IOcount = 0;
 
 		session->type = alloc;
 
@@ -343,11 +344,13 @@ void cNetworkLib::AcceptLoop()
 		//소켓과 IOCP 연결 
 		CreateIoCompletionPort((HANDLE)session->socket, hIocp, (ULONG_PTR)session, 0);
 
+
+
+
 		if (RecvPost(session))
 		{
 			onClientJoin(session->sessionKey);
 		}
-
 
 
 		if (InterlockedDecrement(&session->IOcount) == 0)
@@ -729,17 +732,29 @@ void cNetworkLib::DeleteSession(stSession * session)
 
 	InterlockedDecrement(&ConnectSessioncount);
 	
-	EnterCriticalSection(&session->cs);
+	//EnterCriticalSection(&session->cs);
+	//release 한번만 들어오게 
+
+	LONG64 releasecompare = 0;
+	LONG64 releaseExchange = 1;
+
+
+
+	if (InterlockedCompareExchange64((volatile LONG64*)&session->bRelease, releaseExchange, releasecompare) != releasecompare)
+	{
+		return;
+	}
 
 	if (session->type == release)
 	{
 		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"deletesession - release id -  %d ", session->sessionKey);
-		LeaveCriticalSection(&session->cs);
+		//LeaveCriticalSection(&session->cs);
 
 		return;
 	}
 
 	int sendcount = session->sendQ.Getquesize()/8;
+	session->sendQ.setsendcount(0);
 	for (int i = 0; i < sendcount; i++)
 	{
 		cMassage* packet;
@@ -751,7 +766,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 	session->socket = INVALID_SOCKET;
 	closesocket(session->closesock);
 
-	session->sessionKey = 0;
+	//session->sessionKey = 0;
 	session->bSend = 0;
 
 	session->sendQ.Clearbuf();
@@ -759,7 +774,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 
 	session->type = release;
 
-	LeaveCriticalSection(&session->cs);
+	//LeaveCriticalSection(&session->cs);
 
 
 	ReleaseSession(session);
@@ -781,7 +796,7 @@ cNetworkLib::stSession* cNetworkLib::FindSession(__int64 sessionKey)
 
 void cNetworkLib::CancelSession(stSession * session)
 {
-	EnterCriticalSection(&session->cs);
+	//EnterCriticalSection(&session->cs);
 
 	if (InterlockedExchange((LONG*)&session->bClose, 1) == 0)
 	{
@@ -789,5 +804,5 @@ void cNetworkLib::CancelSession(stSession * session)
 		CancelIo((HANDLE)session->closesock);
 	}
 
-	LeaveCriticalSection(&session->cs);
+	//LeaveCriticalSection(&session->cs);
 }

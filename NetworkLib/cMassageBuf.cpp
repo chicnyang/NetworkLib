@@ -125,12 +125,16 @@ void cMassage::Free()
 	//}
 	//packetdebug[packetcount] = 'f';
 
-
-	if (InterlockedDecrement(&refcount) == 0)
+	int ret = InterlockedDecrement(&refcount);
+	if (ret == 0)
 	{
 		this->bAlloc = false;
 		this->Clear();
 		packetPool->free(this);
+	}
+	else if(ret<0)
+	{
+		dump.Crash();
 	}
 }
 

@@ -300,6 +300,8 @@ int cRingbuffer::Moverear(int isize)
 	if (start == NULL)
 		return -1;
 
+
+
 	int freesize = Getquefreesize();//쓸수있는 용량
 
 
@@ -308,6 +310,11 @@ int cRingbuffer::Moverear(int isize)
 
 
 	rear = (rear + isize) % bufsize;
+	if (front == 1010&&rear == 0)
+	{
+		dump.Crash();
+	}
+
 	return isize;
 
 }

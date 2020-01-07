@@ -54,7 +54,10 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 	}
 	if (session->sessionKey != sessionKey)
 	{
-		LeaveCriticalSection(&session->cs);
+		if (InterlockedDecrement(&session->IOcount) == 0)
+		{
+			DeleteSession(session);
+		}
 
 		return;
 	}
@@ -83,7 +86,10 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 
 	SendPost(session);
 
-	LeaveCriticalSection(&session->cs);
+	if (InterlockedDecrement(&session->IOcount) == 0)
+	{
+		DeleteSession(session);
+	}
 }
 
 void cNetworkLib::Disconnect(__int64 sessionKey)
@@ -115,10 +121,11 @@ void cNetworkLib::StartNetserver(ServerSetting* serversetting)
 
 	for (WORD i = 0; i < poolCount; i++)
 	{
-		InitializeCriticalSection(&sessionPool[i].cs);
+		//InitializeCriticalSection(&sessionPool[i].cs);
 
 		sessionPool[i].bClose = 0;
 		sessionPool[i].bSend = 0;
+		sessionPool[i].bRelease = 1;
 		ZeroMemory(&sessionPool[i].recvoverlap, sizeof(sessionPool[i].recvoverlap));
 		ZeroMemory(&sessionPool[i].sendoverlap, sizeof(sessionPool[i].sendoverlap));
 		sessionPool[i].recvoverlap.mode = recvMode;
@@ -207,7 +214,7 @@ void cNetworkLib::CloseNetserver()
 
 	for (int i = 0; i < poolCount; i++)
 	{
-		DeleteCriticalSection(&sessionPool[i].cs);
+		//DeleteCriticalSection(&sessionPool[i].cs);
 
 		int usesize = sessionPool[i].sendQ.Getquesize();
 		if (usesize > 0)
@@ -315,6 +322,10 @@ void cNetworkLib::AcceptLoop()
 			return;
 		}
 
+
+		InterlockedIncrement(&session->IOcount);
+
+
 		session->sessionKey = sessionNum<<16;
 		__int64* key = &session->sessionKey;
 		*((WORD*)key) = session->ArrayIndex;
@@ -337,6 +348,12 @@ void cNetworkLib::AcceptLoop()
 			onClientJoin(session->sessionKey);
 		}
 
+
+
+		if (InterlockedDecrement(&session->IOcount) == 0)
+		{
+			DeleteSession(session);
+		}
 
 
 		sessionNum++;

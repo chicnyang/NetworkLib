@@ -25,12 +25,7 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 		dump.Crash();
 	}
 
-
 	packet->settingHeader(2);
-
-
-
-
 
 	stSession* session = FindSession(sessionKey);
 	if (session == NULL)
@@ -38,14 +33,23 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 		return;
 	}
 	
+	//세션 찾은후에 IOcount 올리기 
 
-
-	EnterCriticalSection(&session->cs);
-
+	if (InterlockedIncrement(&session->IOcount) == 1)
+	{
+		InterlockedDecrement(&session->IOcount);
+		return;
+	}
 
 	if (session->type == release)
 	{
-		LeaveCriticalSection(&session->cs);
+		InterlockedDecrement(&session->IOcount);
+		return;
+	}
+
+	if (session->bRelease)
+	{
+		InterlockedDecrement(&session->IOcount);
 		return;
 	}
 	if (session->sessionKey != sessionKey)
@@ -63,10 +67,12 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 	if (session->sendQ.Enque((BYTE*)&packet, sizeof(packet)) == -1)
 	{
 		//인큐 실패 -> 세션 클로즈 해야함. 
-		LeaveCriticalSection(&session->cs);
+		//LeaveCriticalSection(&session->cs);
+		InterlockedDecrement(&session->IOcount);
 		CancelSession(session);
 		packet->Free();
 		//cancleio
+		dump.Crash();
 		return;
 	}
 

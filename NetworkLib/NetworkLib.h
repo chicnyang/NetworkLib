@@ -87,9 +87,9 @@ protected:
 		cRingbuffer sendQ;
 		cRingbuffer recvQ;
 
-		CRITICAL_SECTION cs;
-
-		DWORD IOcount;
+	//	CRITICAL_SECTION cs;
+		LONG bRelease;
+		LONG IOcount;
 
 		LONG bSend;
 		LONG bClose;

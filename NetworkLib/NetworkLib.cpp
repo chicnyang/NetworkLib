@@ -106,6 +106,7 @@ void cNetworkLib::StartNetserver(ServerSetting* serversetting)
 	poolCount = serversetting->SessionPoolCount;
 	sessionPool = new stSession[poolCount];
 
+	int size = sizeof(stSession);
 
 	for (WORD i = 0; i < poolCount; i++)
 	{

@@ -79,28 +79,26 @@ protected:
 		SOCKET		socket;
 		SOCKET		closesock;
 
-
+		__int64		sessionKey;
+		LONG bSend;
+		LONG bClose;
 
 		Myoverlapped sendoverlap;
 		Myoverlapped recvoverlap;
 
 		//cRingbuffer sendQ;
 		LockfreeQue<cMassage*>* sendQ;
+
+		cRingbuffer recvQ;
+
 		LockfreeQue<cMassage*>* sendBufque;
 
 		LONG sendcount;
 
-		cRingbuffer recvQ;
-
-	//	CRITICAL_SECTION cs;
-		__int64		sessionKey;
-
 		LONG bRelease;
 		LONG IOcount;
 
-		LONG bSend;
-		LONG bClose;
-
+	//	CRITICAL_SECTION cs;
 		DWORD type;
 
 		DWORD startsend = 0;

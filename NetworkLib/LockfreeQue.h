@@ -190,8 +190,8 @@ private:
 		LONG Qsize;
 	};
 
-	Debug debugArray[100000];
-	LONG debugCount=0;
+	//Debug debugArray[100000];
+	//LONG debugCount=0;
 
 };
 

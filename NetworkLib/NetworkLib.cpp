@@ -34,16 +34,16 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 	}
 	
 	//세션 찾은후에 IOcount 올리기 
+	InterlockedIncrement(&session->IOcount);
+	//if (InterlockedIncrement(&session->IOcount) == 1)
+	//{
+	//	if (InterlockedDecrement(&session->IOcount) == 0)
+	//	{
+	//		DeleteSession(session);
+	//	}
 
-	if (InterlockedIncrement(&session->IOcount) == 1)
-	{
-		if (InterlockedDecrement(&session->IOcount) == 0)
-		{
-			DeleteSession(session);
-		}
-
-		return;
-	}
+	//	return;
+	//}
 
 	if (session->type == release)
 	{

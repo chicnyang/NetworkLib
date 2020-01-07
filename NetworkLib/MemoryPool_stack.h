@@ -1,7 +1,5 @@
 #pragma once
 #include <new>
-#include <Windows.h>
-
 
 //namespace 쓸지말지는 선택 중복이름 없으면 상관없음.
 
@@ -20,11 +18,11 @@ class objectListPool
 		Node* Nextnode;
 	};
 
-	//생성자 파괴자 
-	//false 는 생성자 파괴자 호출을 안에서 안함. 
+	//생성자 파괴자
+	//false 는 생성자 파괴자 호출을 안에서 안함.
 	objectListPool(int poolsize, bool bcreatecall = false)
 	{
-		if (poolsize == 0) //리스트의경우 
+		if (poolsize == 0) //리스트의경우
 		{
 
 		}
@@ -53,7 +51,7 @@ class objectListPool
 	 }
 
 
-	 //alloc 갯수 - 할당 받아둔 갯수 
+	 //alloc 갯수 - 할당 받아둔 갯수
 
 	 int alloccount(void)
 	 {
@@ -188,11 +186,8 @@ class objectListPool
 #ifndef __MEMORY__POOL__
 #define __MEMORY__POOL__
 
-
-
 #define ALLOCSIZE 1000
 #define CHKSUM 0x79ffff79
-
 
 extern cDump dump;
 
@@ -208,10 +203,6 @@ public:
 	//false 는 생성자 파괴자 호출을 안에서 안함. 
 	cMemoryPool(int poolsize, bool bcreatecall = false)
 	{
-
-		InitializeSRWLock(&_poolsrw);
-
-
 		hHeap = HeapCreate(0, 0, 0);
 		createcall = bcreatecall;
 		alloc_count = poolsize;
@@ -220,42 +211,52 @@ public:
 		if (alloc_count == 0) //리스트의경우 
 		{
 		}
-		
-		Node* nextNode = nullptr;
-		for (int i = 0; i < alloc_count; i++)
-		{
-			Node* node = (Node*)HeapAlloc(hHeap,0,sizeof(Node));
-			if (i == 0)
-			{
-				endnode = node;
-			}
 
-			//heap 으로 메모리만 잡았기 때문에 클래스 생성자 호출안됨 
-			node->frontCHKsum = CHKSUM;
-			node->endCHKsum = CHKSUM;
-			node->Nextnode = nextNode;
-			nextNode = node;
-		}
+		//Node* nextNode = nullptr;
+		//for (int i = 0; i < alloc_count; i++)
+		//{
+		//	Node* node = (Node*)HeapAlloc(hHeap, 0, sizeof(Node));
+		//	if (i == 0)
+		//	{
+		//		//endnode = node;
+		//	}
+
+		//	//heap 으로 메모리만 잡았기 때문에 클래스 생성자 호출안됨 
+		//	node->frontCHKsum = CHKSUM;
+		//	node->endCHKsum = CHKSUM;
+		//	node->Nextnode = nextNode;
+		//	nextNode = node;
+		//}
 
 		//맨 처음 노드 
-		freenode = nextNode;
+		//freenode = nextNode;
 
+		_stTop = (stTop*)_aligned_malloc(sizeof(stTop), 16);
+		_stTop->_Top = nullptr;
+		_stTop->popcount = 0;
 	}
 
 	virtual ~cMemoryPool(void)
 	{
+		while (_stTop->_Top != nullptr)
+		{
+			Node* deleteNode = _stTop->_Top;
+			_stTop->_Top = deleteNode->Nextnode;
+			deleteNode->mydata.~Data();
+		}
+		_aligned_free(_stTop);
 		HeapDestroy(hHeap);
 	}
 
 	//alloc
 	Data* alloc(void)
 	{
-		AcquireSRWLockExclusive(&_poolsrw);
-
 		Node* node = nullptr;
 		Node* retnod = nullptr;
 		//없으면 더 만들기
-		if (alloc_count == use_count)
+
+
+		if (InterlockedDecrement(&free_count) < 0)
 		{
 			node = (Node*)HeapAlloc(hHeap, 0, sizeof(Node));
 			node->frontCHKsum = CHKSUM;
@@ -263,105 +264,93 @@ public:
 
 			new(&node->mydata) Data();
 
-			alloc_count++;
-
+			InterlockedIncrement(&alloc_count);
+			InterlockedIncrement(&free_count);
 			retnod = node;
 		}
-		else if (alloc_count < use_count)
-		{
-			dump.Crash();
-		}
 		else
-		{	
-			//생성자 호출할지 여부 파악후 리턴 
-			retnod = freenode;
-			freenode = retnod->Nextnode;
+		{
+			stTop topSrc;
 
-			if (createcall)
+
+			for (;;)
 			{
-				//생성자 호출 
-				new(&retnod->mydata) Data();
+				topSrc.popcount = _stTop->popcount;
+				topSrc._Top = _stTop->_Top;
+				//topSrc = *_stTop;
+				//SwitchToThread();
+				if (InterlockedCompareExchange128((volatile LONG64*)_stTop, (LONG64)_stTop->_Top->Nextnode, 1 + _stTop->popcount, (LONG64*)&topSrc))
+				{
+					break;
+				}
 			}
+
+			retnod = topSrc._Top;
+			////생성자 호출할지 여부 파악후 리턴 
+			//if (createcall)
+			//{
+			//	//생성자 호출 
+			//	new(&retnod->mydata) Data();
+			//}
 		}
 		retnod->Nextnode = nullptr;
-
-		use_count++;
-
-		if ((retnod->mydata).refcount != 0)
-			dump.Crash();
-
-
-		ReleaseSRWLockExclusive(&_poolsrw);
+		InterlockedIncrement(&use_count);
+	
 		return &retnod->mydata;
-
 	}
 
 	//free
 	BOOL free(Data* pData)
 	{
-		AcquireSRWLockExclusive(&_poolsrw);
-
-
-
+		//AcquireSRWLockExclusive(&_poolsrw);
 
 		Node* inNode = (Node*)((char*)pData - sizeof(unsigned int));
-
-
-		if ((inNode->mydata).refcount != 0)
-			dump.Crash();
-
-
-
 		//가득차있다면 false
 		if (use_count == 0)
 		{
-			ReleaseSRWLockExclusive(&_poolsrw);
-
 			//예외발생
 			dump.Crash();
 			return false;
 		}
 		if (inNode->endCHKsum != CHKSUM || inNode->frontCHKsum != CHKSUM)
 		{
-			ReleaseSRWLockExclusive(&_poolsrw);
 			//예외발생 
 			dump.Crash();
 			return false;
 		}
-
 		//소멸자 호출여부
-		if (createcall)
-		{
-			//소멸자 호출 
-			inNode->mydata.~Data();
-			Node* savenode = freenode;
-			freenode = inNode;
-			freenode->Nextnode = savenode;
-		}
-		else
-		{
-			//소멸자 x
-
-
-			if (inNode == freenode)
-			{
-				dump.Crash();
-			}
-
-			inNode->Nextnode = freenode;
-			freenode = inNode;
-		}
-
-		//if (InterlockedIncrement(&cMassage::debugcount) == 10000)
+		//if (createcall)
 		//{
-		//	InterlockedExchange(&cMassage::debugcount, 0);
+		//	//소멸자 호출 
+		//	inNode->mydata.~Data();
+		//	Node* savenode = freenode;
+		//	freenode = inNode;
+		//	freenode->Nextnode = savenode;
 		//}
-		//cMassage::debugbuf[cMassage::debugcount] = 'm';
-		//InterlockedDecrement(&use_count);
-		--use_count;
+		//else
+		//{
+		//	
+		//}
+		stTop topSrc;
 
-		ReleaseSRWLockExclusive(&_poolsrw);
 
+
+		for (;;)
+		{
+			topSrc.popcount = _stTop->popcount;
+			topSrc._Top = _stTop->_Top;
+			//topSrc = *_stTop;
+			//SwitchToThread();
+			inNode->Nextnode = topSrc._Top;
+
+			if (InterlockedCompareExchange128((volatile LONG64*)_stTop, (LONG64)inNode, 1 + _stTop->popcount,(LONG64*)&topSrc))
+			{
+				break;
+			}
+		}
+
+		InterlockedDecrement(&use_count);
+		InterlockedIncrement(&free_count);
 		return true;
 
 	}
@@ -380,7 +369,6 @@ public:
 	{
 		return use_count;
 	}
-
 private:
 
 	//다음 노드의 포인터
@@ -401,15 +389,21 @@ private:
 
 	LONG alloc_count;
 	LONG use_count;
-	Node* freenode;
-	Node* endnode;
+	LONG free_count;
 	BOOL createcall;
 	HANDLE hHeap;
 
-	SRWLOCK _poolsrw;
+	//128 용 구조체 
+	struct stTop
+	{
+		LONG64 popcount;
+		Node* _Top;
+	};
 
+	stTop* _stTop;
 
 };
 
 
 #endif // !__MEMORY__POOL__
+

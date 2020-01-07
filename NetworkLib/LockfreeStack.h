@@ -1,6 +1,4 @@
 #pragma once
-#include <Windows.h>
-#include "DumpFile.h"
 
 #ifndef __LOCK_FREE_STACK__
 #define __LOCK_FREE_STACK__
@@ -15,9 +13,7 @@ class LockfreeStack
 public:
 	LockfreeStack()
 	{
-		char* d = (char*)malloc(sizeof(char));
-
-		//_stTop = (stTop*)malloc(sizeof(stTop));
+		_nodePool = new cMemoryPool<Node>(0);
 		_stTop = (stTop*)_aligned_malloc(sizeof(stTop), 16);
 		_stTop->_Top = nullptr;
 		_stTop->popcount = 0;
@@ -41,32 +37,27 @@ public:
 	void Push(DATA data)
 	{
 		//노드만들어서 붙이기 
-		Node* newNode = new Node;
+		Node* newNode = _nodePool->alloc();
 		newNode->_data = data;
 
 
 		stTop topSrc;
 
-
-
 		for(;;)
 		{
-			topSrc = *_stTop;
-			
-			//topSrc._Top = _stTop->_Top;
-			//topSrc.popcount = _stTop->popcount;
-
-
-			newNode->_nextNode = _stTop->_Top;
-
-			if (InterlockedCompareExchange128((volatile LONG64*)_stTop, (LONG64)newNode, _stTop->popcount, (LONG64*)&topSrc))
-			{
-				break;
-			}
-			//if ((LONG64)topSrc._Top == InterlockedCompareExchange64((volatile LONG64*)&_stTop->_Top,(LONG64)newNode, (LONG64)topSrc._Top))
+			topSrc.popcount = _stTop->popcount;
+			topSrc._Top = _stTop->_Top;
+			//topSrc = *_stTop;
+			//SwitchToThread();
+			newNode->_nextNode = topSrc._Top;
+			//if (InterlockedCompareExchange128((volatile LONG64*)_stTop, (LONG64)newNode, _stTop->popcount + 1, (LONG64*)&topSrc))
 			//{
 			//	break;
 			//}
+			if ((LONG64)topSrc._Top == InterlockedCompareExchange64((volatile LONG64*)&_stTop->_Top, (LONG64)newNode, (LONG64)topSrc._Top))
+			{
+				break;
+			}
 		}
 		InterlockedIncrement(&stacksize);
 	}
@@ -76,23 +67,27 @@ public:
 	{
 		//맨위의 노드 하나 지우고 데이터 넘기기 
 
-		//InterlockedDecrement(&stacksize);
-		if (InterlockedDecrement(&stacksize) < 0)
+		int size = InterlockedDecrement(&stacksize);
+
+		if (size < 0)
 		{
 			InterlockedIncrement(&stacksize);
 			return NULL;
 		}
+		if (_stTop->_Top == nullptr)
+		{
+			dump.Crash();
+		}
 
 		stTop topSrc;
 
-
 		for (;;)
 		{
-			topSrc = *_stTop;
-			//topSrc._Top = _stTop->_Top;
-			//topSrc.popcount = _stTop->popcount;
+			topSrc.popcount = _stTop->popcount;
+			topSrc._Top = _stTop->_Top;
+			//topSrc = *_stTop;
+			//SwitchToThread();
 
-			
 
 			if (InterlockedCompareExchange128((volatile LONG64*)_stTop, (LONG64)_stTop->_Top->_nextNode, _stTop->popcount + 1, (LONG64*)&topSrc))
 			{
@@ -101,12 +96,11 @@ public:
 		}
 
 		DATA retdata = (topSrc._Top)->_data;
-		delete topSrc._Top;
+		_nodePool->free(topSrc._Top);
 		return retdata;
 	}
 	LONG stacksize;
 
-private:
 
 	//노드
 	struct Node
@@ -114,17 +108,19 @@ private:
 		DATA _data;
 		Node* _nextNode;
 	};
+	cMemoryPool<Node> *_nodePool;
+
+private:
 
 	//128 용 구조체 
 	struct stTop 
 	{
 		LONG64 popcount;
 		Node* _Top;
-
 	};
-	
 
 	stTop* _stTop;
+
 
 
 };

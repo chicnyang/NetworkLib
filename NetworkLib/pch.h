@@ -14,12 +14,15 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <Windows.h>
-#include "LockfreeStack.h"
 #include "DumpFile.h"
+#include "MemoryPool_stack.h"
+#include "LockfreeStack.h"
+#include "LockfreeQue.h"
+
 #include <unordered_map>
 #include <process.h>
 //#include <vld.h>
-#include "Objectlistpool.h"
+
 #include "cMassagebuf.h"
 #include "RingbufferQue.h"
 //#include "RingBuffer.h"

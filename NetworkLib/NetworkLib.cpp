@@ -37,19 +37,29 @@ void cNetworkLib::SendPacket(__int64 sessionKey, cMassage * packet)
 
 	if (InterlockedIncrement(&session->IOcount) == 1)
 	{
-		InterlockedDecrement(&session->IOcount);
+		if (InterlockedDecrement(&session->IOcount) == 0)
+		{
+			DeleteSession(session);
+		}
+
 		return;
 	}
 
 	if (session->type == release)
 	{
-		InterlockedDecrement(&session->IOcount);
+		if (InterlockedDecrement(&session->IOcount) == 0)
+		{
+			DeleteSession(session);
+		}
 		return;
 	}
 
 	if (session->bRelease)
 	{
-		InterlockedDecrement(&session->IOcount);
+		if (InterlockedDecrement(&session->IOcount) == 0)
+		{
+			DeleteSession(session);
+		}
 		return;
 	}
 	if (session->sessionKey != sessionKey)
@@ -99,9 +109,6 @@ void cNetworkLib::StartNetserver(ServerSetting* serversetting)
 {
 
 	sessionNum = 1;
-
-
-
 
 	poolCount = serversetting->SessionPoolCount;
 	sessionPool = new stSession[poolCount];
@@ -468,6 +475,7 @@ void cNetworkLib::WorkerLoop()
 					{
 						CancelSession(mysession);
 						LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"io - send trans  %d", transbyte);
+						dump.Crash();
 						break;
 					}
 					else
@@ -570,7 +578,7 @@ void cNetworkLib::SendPost(stSession* session)
 
 	int usesize;
 
-	do
+	for(;;)
 	{
 		if (InterlockedExchange((LONG*)&session->bSend, 1) == 0)
 		{
@@ -599,7 +607,7 @@ void cNetworkLib::SendPost(stSession* session)
 				//wsabuf  에 받을 링버퍼 포인터 넣기 
 				//링버퍼 경계 걸치는 지 확인후 추가로 버퍼포인터 넣을지 결정 
 
-				usesize = session->sendQ->quesize;
+				//usesize = session->sendQ->quesize;
 
 				if (usesize == 0)
 				{
@@ -681,7 +689,7 @@ void cNetworkLib::SendPost(stSession* session)
 
 		break;
 
-	} while (1);
+	}
 
 	
 	return;
@@ -728,7 +736,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 		LOG(L"ringbuffer", LOG_LEVEL_DEBUG, L"deletesession id -  %d ", session->sessionKey);
 	}
 
-	InterlockedDecrement(&ConnectSessioncount);
+
 	
 	//EnterCriticalSection(&session->cs);
 	//release 한번만 들어오게 
@@ -742,6 +750,8 @@ void cNetworkLib::DeleteSession(stSession * session)
 	{
 		return;
 	}
+
+
 
 	if (session->type == release)
 	{
@@ -764,7 +774,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 	}
 	
 	int bufcount = session->sendBufque->quesize;
-	for (int i = 0; i < sendcount; i++)
+	for (int i = 0; i < bufcount; i++)
 	{
 		cMassage* packet;
 		packet = session->sendBufque->Deque();
@@ -773,9 +783,10 @@ void cNetworkLib::DeleteSession(stSession * session)
 			dump.Crash();
 		}
 		packet->Free();
+
 	}
 
-
+	session->sendcount = 0;
 	session->socket = INVALID_SOCKET;
 	closesocket(session->closesock);
 
@@ -789,7 +800,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 
 
 	ReleaseSession(session);
-
+	InterlockedDecrement(&ConnectSessioncount);
 }
 
 cNetworkLib::stSession* cNetworkLib::FindSession(__int64 sessionKey)

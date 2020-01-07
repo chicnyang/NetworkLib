@@ -73,7 +73,7 @@ protected:
 	};
 
 
-	struct stRelease
+	struct alignas(16) stRelease
 	{
 		LONG64 bRelease;
 		LONG64 IOcount;

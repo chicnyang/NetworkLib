@@ -222,6 +222,8 @@ void cNetworkLib::AcceptLoop()
 			return;
 		}
 
+		InterlockedIncrement64(&session->refCnt.IOcount);
+
 		session->sessionKey = sessionNum<<16;
 		__int64* key = &session->sessionKey;
 		*((WORD*)key) = session->ArrayIndex;
@@ -236,22 +238,22 @@ void cNetworkLib::AcceptLoop()
 		InputSession(session);  
 
 
-		for(;;)
-		{
-			stRelease srcrelease;
-			srcrelease.bRelease = 1;
-			srcrelease.IOcount = 0;
+		//for(;;)
+		//{
+		//	stRelease srcrelease;
+		//	srcrelease.bRelease = 1;
+		//	srcrelease.IOcount = 0;
 
-			stRelease Exrelease;
-			Exrelease.bRelease = 0;
-			Exrelease.IOcount = 1;
+		//	stRelease Exrelease;
+		//	Exrelease.bRelease = 0;
+		//	Exrelease.IOcount = 1;
 
-			if (InterlockedCompareExchange128((volatile LONG64*)&(session->refCnt), (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
-			{
-				break;
-			}
+		//	if (InterlockedCompareExchange128((volatile LONG64*)&(session->refCnt), (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
+		//	{
+		//		break;
+		//	}
 
-		}
+		//}
 
 
 
@@ -263,6 +265,8 @@ void cNetworkLib::AcceptLoop()
 		{
 			onClientJoin(session->sessionKey);
 		}
+
+		session->refCnt.bRelease = 0;
 
 		if (InterlockedDecrement64(&session->refCnt.IOcount) == 0)
 		{

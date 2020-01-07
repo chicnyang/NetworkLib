@@ -222,23 +222,10 @@ void cNetworkLib::AcceptLoop()
 			return;
 		}
 
+		//세션 iocount 증가
 		InterlockedIncrement64(&session->refCnt.IOcount);
 
-		session->sessionKey = sessionNum<<16;
-		__int64* key = &session->sessionKey;
-		*((WORD*)key) = session->ArrayIndex;
-
-
-		session->socket = sock;
-		session->closesock = sock;
-
-		session->type = alloc;
-
-		// 맵에 넣기 
-		InputSession(session);  
-
-
-		//for(;;)
+		//for (;;)
 		//{
 		//	stRelease srcrelease;
 		//	srcrelease.bRelease = 1;
@@ -254,6 +241,22 @@ void cNetworkLib::AcceptLoop()
 		//	}
 
 		//}
+
+
+		session->sessionKey = sessionNum<<16;
+		__int64* key = &session->sessionKey;
+		*((WORD*)key) = session->ArrayIndex;
+
+
+		session->socket = sock;
+		session->closesock = sock;
+
+		session->type = alloc;
+
+		// 맵에 넣기 
+		InputSession(session);  
+
+		session->refCnt.bRelease = 0;
 
 
 
@@ -742,7 +745,7 @@ void cNetworkLib::DeleteSession(stSession * session)
 	Exrelease.bRelease = 1;
 	Exrelease.IOcount = 0;
 
-	if (InterlockedCompareExchange128((volatile LONG64*)&session->refCnt, (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
+	if (!InterlockedCompareExchange128((volatile LONG64*)&session->refCnt, (LONG64)Exrelease.IOcount, (LONG64)Exrelease.bRelease, (LONG64*)&srcrelease))
 	{
 		return;
 	}

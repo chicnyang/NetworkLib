@@ -252,9 +252,8 @@ public:
 	Data* alloc(void)
 	{
 		Node* node = nullptr;
-		Node* retnod = nullptr;
 		//없으면 더 만들기
-
+		Data* retdata;
 
 		if (InterlockedDecrement(&free_count) < 0)
 		{
@@ -266,7 +265,7 @@ public:
 
 			InterlockedIncrement(&alloc_count);
 			InterlockedIncrement(&free_count);
-			retnod = node;
+			retdata = &node->mydata;
 		}
 		else
 		{
@@ -279,13 +278,14 @@ public:
 				topSrc._Top = _stTop->_Top;
 				//topSrc = *_stTop;
 				//SwitchToThread();
+				retdata = &topSrc._Top->mydata;
 				if (InterlockedCompareExchange128((volatile LONG64*)_stTop, (LONG64)_stTop->_Top->Nextnode, 1 + _stTop->popcount, (LONG64*)&topSrc))
 				{
 					break;
 				}
 			}
 
-			retnod = topSrc._Top;
+			//retnod = topSrc._Top;
 			////생성자 호출할지 여부 파악후 리턴 
 			//if (createcall)
 			//{
@@ -293,10 +293,10 @@ public:
 			//	new(&retnod->mydata) Data();
 			//}
 		}
-		retnod->Nextnode = nullptr;
+		//retnod->Nextnode = nullptr;
 		InterlockedIncrement(&use_count);
 	
-		return &retnod->mydata;
+		return retdata;
 	}
 
 	//free

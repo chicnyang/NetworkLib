@@ -163,6 +163,7 @@
     <ClInclude Include="LockfreeQue.h" />
     <ClInclude Include="LockfreeStack.h" />
     <ClInclude Include="logfile.h" />
+    <ClInclude Include="MemoryPoolTLS.h" />
     <ClInclude Include="MemoryPool_stack.h" />
     <ClInclude Include="NetworkLib.h" />
     <ClInclude Include="pch.h" />

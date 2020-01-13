@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 
-cMemoryPool<cMassage>* cMassage::packetPool;
+cMemorypoolTLS<cMassage>* cMassage::packetPool;
 
 // LONG cMassage::debugcount;
  //char cMassage::debugbuf[10000];
@@ -97,15 +97,17 @@ void cMassage::Release(void)
 
 void cMassage::MemoryPool(int size)
 {
-	//debugcount = 0;
-	//ZeroMemory(debugbuf, sizeof(debugbuf));
-	packetPool = new cMemoryPool<cMassage>(size);
+	packetPool = new cMemorypoolTLS<cMassage>;
 }
 
-cMassage * cMassage::Alloc()
+cMassage* cMassage::Alloc()
 {
+
+
+
 	cMassage* msg = packetPool->alloc();
-	if(msg->refcount != 0)
+	int rciunt = msg->refcount;
+	if(rciunt != 0)
 	{
 		dump.Crash();
 	}
@@ -118,18 +120,18 @@ cMassage * cMassage::Alloc()
 
 void cMassage::Free()
 {
-	//++packetcount;
-	//if (packetcount == 1000)
-	//{
-	//	packetcount = 0;
-	//}
-	//packetdebug[packetcount] = 'f';
+	InterlockedIncrement(&packetcount);
+	if (packetcount == 10000)
+	{
+		packetcount = 0;
+	}
+	packetdebug[packetcount] = 'f';
 
 	int ret = InterlockedDecrement(&refcount);
 	if (ret == 0)
 	{
 		this->bAlloc = false;
-		this->Clear();
+		//this->Clear();
 		packetPool->free(this);
 	}
 	else if(ret<0)
@@ -141,6 +143,14 @@ void cMassage::Free()
 //메시지 청소  -  버퍼 비우기 
 void cMassage::Clear(void)
 {
+
+	InterlockedIncrement(&packetcount);
+	if (packetcount == 10000)
+	{
+		packetcount = 0;
+	}
+	packetdebug[packetcount] = 'c';
+
 	sendflag = false;
 
 	front = 0;
@@ -573,12 +583,12 @@ int cMassage::GetsizePacketPool()
 
 void cMassage::refcntUp()
 {
-	//++packetcount;
-	//if (packetcount == 1000)
-	//{
-	//	packetcount = 0;
-	//}
-	//packetdebug[packetcount] = 'u';
+	InterlockedIncrement(&packetcount);
+	if (packetcount == 10000)
+	{
+		packetcount = 0;
+	}
+	packetdebug[packetcount] = 'u';
 
 	if (InterlockedIncrement(&refcount) == 0)
 		dump.Crash();
@@ -586,12 +596,12 @@ void cMassage::refcntUp()
 
 void cMassage::refcntDown()
 {
-	//++packetcount;
-	//if (packetcount == 1000)
-	//{
-	//	packetcount = 0;
-	//}
-	//packetdebug[packetcount] = 'd';
+	InterlockedIncrement(&packetcount);
+	if (packetcount == 10000)
+	{
+		packetcount = 0;
+	}
+	packetdebug[packetcount] = 'd';
 	if(InterlockedDecrement(&refcount) < 0)
 		dump.Crash();
 }

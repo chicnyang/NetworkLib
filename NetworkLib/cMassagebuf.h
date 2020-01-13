@@ -76,7 +76,7 @@ public:
 	//빼다가 오류 났는지 확인
 	BOOL sizeerr();
 
-	static cMemoryPool<cMassage>* packetPool;
+	static cMemorypoolTLS<cMassage>* packetPool;
 
 	static int GetUsePacket();
 	static int GetsizePacketPool();
@@ -97,7 +97,7 @@ private:
 	//헤더 세팅 함수 
 	void settingHeader(int byte);
 	friend class  cNetworkLib;
-	friend class  cMemoryPool<cMassage>;
+	friend class  cChunk<cMassage>;
 
 
 	cMassage();
@@ -126,8 +126,8 @@ private:
 	//static LONG debugcount;
 	//static char debugbuf[10000];
 
-	//int packetcount=0;
-	//char packetdebug[1000] = {0,};
+	LONG packetcount=0;
+	char packetdebug[10000] = {0,};
 
 	BOOL sendflag = false;
 

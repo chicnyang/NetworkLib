@@ -15,6 +15,7 @@
 #include <ws2tcpip.h>
 #include <Windows.h>
 #include "DumpFile.h"
+#include "MemoryPoolTLS.h"
 #include "MemoryPool_stack.h"
 #include "LockfreeStack.h"
 #include "LockfreeQue.h"

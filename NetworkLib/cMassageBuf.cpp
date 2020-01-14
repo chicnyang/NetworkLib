@@ -120,12 +120,12 @@ cMassage* cMassage::Alloc()
 
 void cMassage::Free()
 {
-	InterlockedIncrement(&packetcount);
-	if (packetcount == 10000)
-	{
-		packetcount = 0;
-	}
-	packetdebug[packetcount] = 'f';
+	//InterlockedIncrement(&packetcount);
+	//if (packetcount == 10000)
+	//{
+	//	packetcount = 0;
+	//}
+	//packetdebug[packetcount] = 'f';
 
 	int ret = InterlockedDecrement(&refcount);
 	if (ret == 0)
@@ -144,12 +144,12 @@ void cMassage::Free()
 void cMassage::Clear(void)
 {
 
-	InterlockedIncrement(&packetcount);
-	if (packetcount == 10000)
-	{
-		packetcount = 0;
-	}
-	packetdebug[packetcount] = 'c';
+	//InterlockedIncrement(&packetcount);
+	//if (packetcount == 10000)
+	//{
+	//	packetcount = 0;
+	//}
+	//packetdebug[packetcount] = 'c';
 
 	sendflag = false;
 
@@ -583,12 +583,12 @@ int cMassage::GetsizePacketPool()
 
 void cMassage::refcntUp()
 {
-	InterlockedIncrement(&packetcount);
-	if (packetcount == 10000)
-	{
-		packetcount = 0;
-	}
-	packetdebug[packetcount] = 'u';
+	//InterlockedIncrement(&packetcount);
+	//if (packetcount == 10000)
+	//{
+	//	packetcount = 0;
+	//}
+	//packetdebug[packetcount] = 'u';
 
 	if (InterlockedIncrement(&refcount) == 0)
 		dump.Crash();
@@ -596,12 +596,12 @@ void cMassage::refcntUp()
 
 void cMassage::refcntDown()
 {
-	InterlockedIncrement(&packetcount);
-	if (packetcount == 10000)
-	{
-		packetcount = 0;
-	}
-	packetdebug[packetcount] = 'd';
+	//InterlockedIncrement(&packetcount);
+	//if (packetcount == 10000)
+	//{
+	//	packetcount = 0;
+	//}
+	//packetdebug[packetcount] = 'd';
 	if(InterlockedDecrement(&refcount) < 0)
 		dump.Crash();
 }

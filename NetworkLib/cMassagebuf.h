@@ -97,7 +97,7 @@ private:
 	//헤더 세팅 함수 
 	void settingHeader(int byte);
 	friend class  cNetworkLib;
-	friend class  cChunk<cMassage>;
+	friend class  cMemorypoolTLS<cMassage>;
 
 
 	cMassage();
@@ -126,8 +126,8 @@ private:
 	//static LONG debugcount;
 	//static char debugbuf[10000];
 
-	LONG packetcount=0;
-	char packetdebug[10000] = {0,};
+	//LONG packetcount=0;
+	//char packetdebug[10000] = {0,};
 
 	BOOL sendflag = false;
 

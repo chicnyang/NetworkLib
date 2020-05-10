@@ -104,6 +104,7 @@ void cMassage::MemoryPool(int size)
 
 cMassage * cMassage::Alloc()
 {
+	AcquireSRWLockExclusive(&_poolsrw);
 	cMassage* msg = packetPool->alloc();
 	if(msg->refcount != 0)
 	{

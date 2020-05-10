@@ -209,7 +209,7 @@ public:
 	cMemoryPool(int poolsize, bool bcreatecall = false)
 	{
 
-		InitializeSRWLock(&_poolsrw);
+
 
 
 		hHeap = HeapCreate(0, 0, 0);
@@ -250,7 +250,6 @@ public:
 	//alloc
 	Data* alloc(void)
 	{
-		AcquireSRWLockExclusive(&_poolsrw);
 
 		Node* node = nullptr;
 		Node* retnod = nullptr;
@@ -313,7 +312,7 @@ public:
 		}
 		if (inNode->endCHKsum != CHKSUM || inNode->frontCHKsum != CHKSUM)
 		{
-			ReleaseSRWLockExclusive(&_poolsrw);
+
 			//예외발생 
 			dump.Crash();
 			return false;
@@ -396,7 +395,7 @@ private:
 	BOOL createcall;
 	HANDLE hHeap;
 
-	SRWLOCK _poolsrw;
+
 
 
 };
